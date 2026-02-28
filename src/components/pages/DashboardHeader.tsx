@@ -30,7 +30,7 @@ export default function DashboardHeader() {
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="grid grid-cols-3 gap-4 items-center">
           <div className="flex items-center">
-            <div className="text-lg font-semibold bungee">ORA</div>
+            <div className="text-lg font-semibold bungee">TheMemoryBox</div>
           </div>
 
           <div className="flex justify-center">

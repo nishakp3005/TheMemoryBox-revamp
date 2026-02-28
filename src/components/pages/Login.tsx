@@ -69,9 +69,9 @@ const Login = () => {
           <Link href="/" className="inline-block">
             <div className="flex items-center justify-center space-x-2">
               <div className="w-8 h-8 rounded-md bg-primary/90 flex items-center justify-center text-white font-bold">
-                <img src="./logo-whitebg.png" alt="ORA Logo" />
+                <img src="./logo-whitebg.png" alt="TheMemoryBox Logo" />
               </div>
-              <h1 className="text-2xl font-bold">ORA</h1>
+              <h1 className="text-2xl font-bold">TheMemoryBox</h1>
             </div>
           </Link>
         </div>

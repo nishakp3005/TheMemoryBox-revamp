@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ORA",
-  description: "ORA helps you find your signature scent.",
+  title: "The Memory Box",
+  description: "The Memory Box is a web application that allows users to create and share their memories in a digital format. Users can create memory boxes, add photos, videos, and notes to their boxes, and share them with friends and family.",
 };
 
 export default function RootLayout({

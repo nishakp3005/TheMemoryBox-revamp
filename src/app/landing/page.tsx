@@ -4,7 +4,7 @@ export default function Landing() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-background/80 p-8">
       <div className="max-w-2xl w-full text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to ORA</h1>
+        <h1 className="text-4xl font-bold mb-4">Welcome to TheMemoryBox</h1>
         <p className="text-muted-foreground mb-8">
           Sign in to access your dashboard or create a new account.
         </p>

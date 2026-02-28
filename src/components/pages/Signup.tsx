@@ -87,7 +87,7 @@ const Signup = () => {
               <div className="w-8 h-8 rounded-md bg-primary/90 flex items-center justify-center text-white font-bold">
                 A
               </div>
-              <h1 className="text-2xl font-bold">ORA</h1>
+              <h1 className="text-2xl font-bold">TheMemoryBox</h1>
             </div>
           </Link>
         </div>
