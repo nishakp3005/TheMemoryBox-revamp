@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 // Link and sidebar icons removed — sidebar is now global
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { authClient } from "@/lib/auth-client";
 // Logo moved to Sidebar component
 
 const sampleImages = [
-  "/file.svg",
   "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=800&q=80",
   "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=800&q=80",
   "https://images.unsplash.com/photo-1517423440428-a5a00ad493e8?w=800&q=80",
@@ -30,12 +29,32 @@ const Dashboard: React.FC<Props> = () => {
   const router = useRouter();
   const { toast } = useToast();
 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/session");
+        const json = await res.json();
+        if (mounted && !json?.user) {
+          router.replace("/login");
+        }
+      } catch (err) {
+        // on error, be conservative and redirect to login
+        console.error("Error checking session:", err);
+        if (mounted) router.replace("/login");
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
+
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
       await authClient.signOut();
       toast({ title: "Signed out successfully" });
-      router.push("/login");
+      router.replace("/login");
     } catch (error) {
       console.error("Error signing out", error);
       toast({

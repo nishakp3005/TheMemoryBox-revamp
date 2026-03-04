@@ -3,12 +3,10 @@ import Link from "next/link";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-background/80 p-4">
+    <div className="h-full flex items-center justify-center bg-gradient-to-b from-background to-background/80 px-4">
       <div className="w-full max-w-xl text-center">
         <div className="mb-8">
-          <img
-            src="/logo.png" alt="The Memory Box" className="mx-auto h-16"
-          />
+          <img src="/logo.png" alt="The Memory Box" className="mx-auto h-16" />
           <h1 className="text-4xl font-bold mt-4">Welcome to The Memory Box</h1>
           <p className="text-muted-foreground mt-2">
             Join us and start saving your memories.
