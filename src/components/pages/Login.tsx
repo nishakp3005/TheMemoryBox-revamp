@@ -70,7 +70,7 @@ const Login = () => {
             <div className="flex items-center justify-center">
               {/* use brand logo everywhere */}
               <img
-                src="/logo-dark-nobg.png"
+                src="/logo.png"
                 alt="The Memory Box"
                 className="h-12"
               />

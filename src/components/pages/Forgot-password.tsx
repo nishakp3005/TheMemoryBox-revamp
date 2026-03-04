@@ -43,7 +43,7 @@ const ForgotPassword = () => {
 
   const onSubmit = async (data: ForgotPasswordFormValues) => {
     setPending(true);
-    const { error } = await authClient.forgetPassword({
+    const { error } = await (authClient as any).forgetPassword({
       email: data.email,
       redirectTo: "/reset-password",
     });
@@ -70,11 +70,7 @@ const ForgotPassword = () => {
         <div className="text-center mb-8">
           <Link href="/" className="inline-block">
             <div className="flex items-center justify-center">
-              <img
-                src="/logo-dark-nobg.png"
-                alt="The Memory Box"
-                className="h-12"
-              />
+              <img src="/logo.png" alt="The Memory Box" className="h-12" />
             </div>
           </Link>
         </div>

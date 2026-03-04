@@ -10,7 +10,7 @@ const Logo: React.FC<{
   return (
     <div className={"flex items-center " + className}>
       <Image
-        src="/logo-dark-nobg.png"
+        src="/logo.png"
         alt="The Memory Box"
         width={width}
         height={height}

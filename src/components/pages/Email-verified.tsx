@@ -9,7 +9,7 @@ const EmailVerified = () => {
       <div className="w-full max-w-md p-8 space-y-6 text-center bg-white rounded-lg shadow-md">
         <div className="flex justify-center">
           <img
-            src="/logo-dark-nobg.png"
+            src="/logo.png"
             alt="The Memory Box"
             className="h-12"
           />

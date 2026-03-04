@@ -7,9 +7,7 @@ export default function LandingPage() {
       <div className="w-full max-w-xl text-center">
         <div className="mb-8">
           <img
-            src="/logo-dark-nobg.png"
-            alt="The Memory Box"
-            className="mx-auto h-16"
+            src="/logo.png" alt="The Memory Box" className="mx-auto h-16"
           />
           <h1 className="text-4xl font-bold mt-4">Welcome to The Memory Box</h1>
           <p className="text-muted-foreground mt-2">

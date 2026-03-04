@@ -84,7 +84,7 @@ const Signup = () => {
           <Link href="/" className="inline-block">
             <div className="flex items-center justify-center">
               <img
-                src="/logo-dark-nobg.png"
+                src="/logo.png"
                 alt="The Memory Box"
                 className="h-12"
               />
