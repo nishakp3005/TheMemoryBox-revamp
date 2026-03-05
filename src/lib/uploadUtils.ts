@@ -25,7 +25,7 @@ export function verifyUploadToken(token: string) {
   try {
     const json = Buffer.from(data, "base64url").toString();
     return JSON.parse(json) as { publicId: string; userId: string };
-  } catch (e) {
+  } catch {
     return null;
   }
 }

@@ -1,11 +1,9 @@
 "use client";
 import React, { useState } from "react";
 import { Mail, ArrowRight, Loader2 } from "lucide-react";
-import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -14,14 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form } from "@/components/ui/form";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { InputField } from "@/components/Auth/FormFields";
@@ -43,7 +34,14 @@ const ForgotPassword = () => {
 
   const onSubmit = async (data: ForgotPasswordFormValues) => {
     setPending(true);
-    const { error } = await (authClient as any).forgetPassword({
+    const { error } = await (
+      authClient as unknown as {
+        forgetPassword: (opts: {
+          email: string;
+          redirectTo: string;
+        }) => Promise<{ error?: { message: string } }>;
+      }
+    ).forgetPassword({
       email: data.email,
       redirectTo: "/reset-password",
     });

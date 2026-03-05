@@ -1,5 +1,5 @@
 "use client";
-import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, Eye, EyeOff } from "lucide-react";
 import {
   FormField,
   FormItem,
@@ -10,10 +10,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
+import type { Control, FieldValues, Path } from "react-hook-form";
 
-type InputFieldProps = {
-  control: any;
-  name: string;
+type InputFieldProps<T extends FieldValues = FieldValues> = {
+  control: Control<T>;
+  name: Path<T>;
   label: string;
   placeholder: string;
   type: "email" | "password" | "text";
@@ -21,7 +22,7 @@ type InputFieldProps = {
   showPasswordToggle?: boolean;
 };
 
-export const InputField = ({
+export const InputField = <T extends FieldValues = FieldValues>({
   control,
   name,
   label,
@@ -29,7 +30,7 @@ export const InputField = ({
   type,
   icon = <Mail className="h-5 w-5 text-muted-foreground" />,
   showPasswordToggle = false,
-}: InputFieldProps) => {
+}: InputFieldProps<T>) => {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
@@ -72,13 +73,17 @@ export const InputField = ({
   );
 };
 
-type CheckboxFieldProps = {
-  control: any;
-  name: string;
+type CheckboxFieldProps<T extends FieldValues = FieldValues> = {
+  control: Control<T>;
+  name: Path<T>;
   label: string;
 };
 
-export const CheckboxField = ({ control, name, label }: CheckboxFieldProps) => {
+export const CheckboxField = <T extends FieldValues = FieldValues>({
+  control,
+  name,
+  label,
+}: CheckboxFieldProps<T>) => {
   return (
     <FormField
       control={control}

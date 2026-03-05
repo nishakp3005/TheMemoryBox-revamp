@@ -1,11 +1,10 @@
 "use client";
 import React, { useState } from "react";
 import { Lock, ArrowRight, Loader2 } from "lucide-react";
-import { z } from "zod";
+// removed unused `z` import
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -13,14 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form } from "@/components/ui/form";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -34,6 +26,19 @@ import { authClient } from "@/lib/auth-client";
 const ResetPassword = () => {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+
+  const form = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  const [pending, setPending] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+
   if (!token) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-background/80 p-4">
@@ -54,17 +59,6 @@ const ResetPassword = () => {
       </div>
     );
   }
-  const form = useForm<ResetPasswordFormValues>({
-    resolver: zodResolver(resetPasswordSchema),
-    defaultValues: {
-      password: "",
-      confirmPassword: "",
-    },
-  });
-
-  const [pending, setPending] = useState(false);
-  const router = useRouter();
-  const { toast } = useToast();
 
   const onSubmit = async (data: ResetPasswordFormValues) => {
     setPending(true);
@@ -95,11 +89,7 @@ const ResetPassword = () => {
         <div className="text-center mb-8">
           <Link href="/" className="inline-block">
             <div className="flex items-center justify-center">
-              <img
-                src="/logo.png"
-                alt="The Memory Box"
-                className="h-12"
-              />
+              <img src="/logo.png" alt="The Memory Box" className="h-12" />
             </div>
           </Link>
         </div>

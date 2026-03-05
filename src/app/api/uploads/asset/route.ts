@@ -35,7 +35,9 @@ export async function GET(req: Request) {
 
     // For the JSON response (non-raw), require an authenticated session as before
     const hd = await headers();
-    const session = await auth.api.getSession({ headers: hd as any });
+    const session = await auth.api.getSession({
+      headers: hd as unknown as Headers,
+    });
     if (!session?.user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (session.user.id !== payload.userId)
@@ -60,7 +62,9 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Invalid token" }, { status: 400 });
 
     const hd = await headers();
-    const session = await auth.api.getSession({ headers: hd as any });
+    const session = await auth.api.getSession({
+      headers: hd as unknown as Headers,
+    });
     if (!session?.user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (session.user.id !== payload.userId)
@@ -86,9 +90,8 @@ export async function DELETE(req: Request) {
       cloudinary.uploader.destroy(
         upload.publicId,
         { resource_type: resourceType },
-        (err: unknown, result?: Record<string, unknown>) => {
+        (err: unknown) => {
           if (err) return reject(err);
-          // Cloudinary returns e.g. { result: 'ok' } or { result: 'not found' }
           resolve();
         },
       );

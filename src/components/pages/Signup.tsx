@@ -1,11 +1,11 @@
 "use client";
 import React, { useState } from "react";
 import { Mail, Lock, User, ArrowRight, Loader2 } from "lucide-react";
-import { z } from "zod";
+// removed unused `z` import
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+// removed unused `Input` import
 import {
   Card,
   CardContent,
@@ -14,17 +14,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form } from "@/components/ui/form";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
-import { GoogleIcon } from "@/components/ui/google-icon";
+// removed unused `GoogleIcon` import
 import { GoogleAuthButton } from "@/components/Auth/GoogleAuthButton";
 import { InputField } from "@/components/Auth/FormFields";
 import { SignUpFormValues, signUpSchema } from "@/lib/schema/signupSchema";
@@ -83,11 +76,7 @@ const Signup = () => {
         <div className="text-center mb-8">
           <Link href="/" className="inline-block">
             <div className="flex items-center justify-center">
-              <img
-                src="/logo.png"
-                alt="The Memory Box"
-                className="h-12"
-              />
+              <img src="/logo.png" alt="The Memory Box" className="h-12" />
             </div>
           </Link>
         </div>

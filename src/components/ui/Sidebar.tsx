@@ -18,7 +18,7 @@ export default function Sidebar() {
         const name = data?.user?.name ?? data?.user?.email ?? null;
         setUsername(name);
       } catch (err) {
-        // ignore
+        void err;
       }
     })();
     return () => {

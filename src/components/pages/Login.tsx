@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
-import { z } from "zod";
+// removed unused `z` import
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -69,11 +69,7 @@ const Login = () => {
           <Link href="/" className="inline-block">
             <div className="flex items-center justify-center">
               {/* use brand logo everywhere */}
-              <img
-                src="/logo.png"
-                alt="The Memory Box"
-                className="h-12"
-              />
+              <img src="/logo.png" alt="The Memory Box" className="h-12" />
             </div>
           </Link>
         </div>
@@ -162,7 +158,7 @@ const Login = () => {
               />
             </div>
             <div className="text-center text-sm">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link
                 href="/signup"
                 className="font-medium text-primary underline-offset-4 hover:underline"
