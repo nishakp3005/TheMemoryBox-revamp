@@ -1,12 +1,13 @@
 {
-  "name": "better-auth-youtube",
+  "name": "TheMemoryBox",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check": "npx tsc --noEmit && npm run lint && npx depcheck"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -17,9 +18,12 @@
     "@radix-ui/react-toast": "^1.2.7",
     "better-auth": "^1.2.7",
     "class-variance-authority": "^0.7.1",
+    "cloudinary": "^1.41.3",
     "clsx": "^2.1.1",
+    "formidable": "^3.0.0",
     "lucide-react": "^0.488.0",
     "next": "15.3.0",
+    "next-cloudinary": "^6.17.5",
     "nodemailer": "^6.10.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

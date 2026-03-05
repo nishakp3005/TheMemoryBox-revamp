@@ -50,6 +50,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   } catch (err) {
     // on any error, redirect to login (safe fallback)
+    console.error("Middleware error", err);
     return NextResponse.redirect(new URL("/login", req.url));
   }
 }

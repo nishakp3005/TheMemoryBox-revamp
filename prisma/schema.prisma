@@ -23,6 +23,7 @@ model User {
   updatedAt     DateTime
   sessions      Session[]
   accounts      Account[]
+  uploads       Upload[]
 
   @@unique([email])
   @@map("user")
@@ -71,4 +72,17 @@ model Verification {
   updatedAt  DateTime?
 
   @@map("verification")
+}
+
+model Upload {
+  id           String   @id @map("_id") @default(auto()) @db.ObjectId
+  userId       String
+  publicId     String
+  url          String
+  resourceType String
+  createdAt    DateTime
+  updatedAt    DateTime?
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("upload")
 }
