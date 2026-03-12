@@ -1,11 +1,16 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Home, Folder, Clock, Gift, Bell } from "lucide-react";
+import { Home, Folder, Clock, Gift, Bell, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
+import { authClient } from "@/lib/auth-client";
 import Logo from "@/components/ui/Logo";
 
 export default function Sidebar() {
   const [username, setUsername] = useState<string | null>(null);
+  const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     let mounted = true;
@@ -75,11 +80,26 @@ export default function Sidebar() {
           <span>Notifs</span>
         </Link>
 
-        <div>
-          <h2 className="text-2xl font-bold">{title}</h2>
-          <p className="text-sm text-stone-400">
-            A collection of your memories
-          </p>
+        {/* title moved to bottom to keep nav compact */}
+      </div>
+      <div className="mt-auto pt-4 border-t border-stone-800">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-stone-200">{title}</h2>
+          <button
+            onClick={async () => {
+              try {
+                await authClient.signOut();
+                toast({ title: "Signed out" });
+                router.replace("/login");
+              } catch (err) {
+                console.error(err);
+                toast({ variant: "destructive", title: "Could not sign out" });
+              }
+            }}
+            className="ml-2 flex items-center gap-2 px-3 py-3 rounded-md bg-stone-200"
+          >
+            <LogOut className="h-4 w-4 text-pink-400" />
+          </button>
         </div>
       </div>
     </aside>

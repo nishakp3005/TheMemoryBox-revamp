@@ -3,10 +3,9 @@ import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 // Link and sidebar icons removed — sidebar is now global
 import { Button } from "@/components/ui/button";
-import { LogOut, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { authClient } from "@/lib/auth-client";
 // Logo moved to Sidebar component
 
 // const sampleImages = [
@@ -24,8 +23,13 @@ type Props = {
   username?: string;
   userEmail?: string;
 };
+type ServerUpload = {
+  id?: string;
+  url?: string;
+  resourceType?: string;
+  token?: string;
+};
 const Dashboard: React.FC<Props> = () => {
-  const [isSigningOut, setIsSigningOut] = useState(false);
   const [previews, setPreviews] = useState<
     Array<{ id?: string; url: string; type: string; token?: string }>
   >([]);
@@ -33,6 +37,7 @@ const Dashboard: React.FC<Props> = () => {
   const [modalUrl, setModalUrl] = useState<string | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+
   const [albumName, setAlbumName] = useState<string>("");
   const inputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
@@ -121,24 +126,6 @@ const Dashboard: React.FC<Props> = () => {
     return () => document.removeEventListener("keydown", handler);
   }, [selected, previews]);
 
-  const handleSignOut = async () => {
-    setIsSigningOut(true);
-    try {
-      await authClient.signOut();
-      toast({ title: "Signed out successfully" });
-      router.replace("/login");
-    } catch (error) {
-      console.error("Error signing out", error);
-      toast({
-        variant: "destructive",
-        title: "Error signing out",
-        description: "There was a problem signing out",
-      });
-    } finally {
-      setIsSigningOut(false);
-    }
-  };
-
   return (
     <>
       {/* Main content */}
@@ -152,12 +139,7 @@ const Dashboard: React.FC<Props> = () => {
       >
         <header className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <input
-                type="date"
-                className="bg-stone-800 border border-stone-700 text-stone-200 px-3 py-2 rounded-md"
-              />
-            </div>
+            <div className="flex items-center gap-4" />
             {/* hidden file input (always present) */}
             <input
               ref={inputRef}
@@ -196,6 +178,7 @@ const Dashboard: React.FC<Props> = () => {
                   const json = (await res.json()) as {
                     ok?: boolean;
                     results?: Array<{
+                      id?: string;
                       url?: string;
                       resourceType?: string;
                       token?: string;
@@ -276,6 +259,7 @@ const Dashboard: React.FC<Props> = () => {
             />
 
             <div className="flex items-center gap-3">
+              <div />
               {selectMode ? (
                 <div className="flex items-center gap-2">
                   <input
@@ -292,6 +276,7 @@ const Dashboard: React.FC<Props> = () => {
                     <Upload className="mr-2 h-4 w-4" /> Upload
                   </Button>
                   <Button
+                    className="bg-[#F15087] text-white hover:bg-[#e03a73]"
                     onClick={async () => {
                       if (!albumName.trim()) {
                         toast({ title: "Please provide an album name" });
@@ -302,7 +287,7 @@ const Dashboard: React.FC<Props> = () => {
                         const res = await fetch("/api/uploads");
                         const json = await res.json();
                         const serverResults = Array.isArray(json?.results)
-                          ? json.results
+                          ? (json.results as ServerUpload[])
                           : [];
                         const sel = Array.from(selected).sort((a, b) => a - b);
                         const uploadIds: string[] = [];
@@ -310,7 +295,7 @@ const Dashboard: React.FC<Props> = () => {
                           const p = previews[i];
                           if (!p) continue;
                           const match = serverResults.find(
-                            (s: any) =>
+                            (s: ServerUpload) =>
                               (p.token && s.token === p.token) ||
                               (s.url && p.url === s.url),
                           );
@@ -408,7 +393,7 @@ const Dashboard: React.FC<Props> = () => {
                     Share
                   </Button>
                   <Button
-                    variant="destructive"
+                    className="bg-[#F15087] text-white hover:bg-[#e03a73]"
                     onClick={async () => {
                       if (
                         !confirm(
@@ -448,30 +433,73 @@ const Dashboard: React.FC<Props> = () => {
                   >
                     Delete
                   </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={async () => {
+                      const name = window.prompt("Create album name:");
+                      if (!name || !name.trim()) return;
+                      try {
+                        const res = await fetch("/api/uploads");
+                        const json = await res.json();
+                        const serverResults = Array.isArray(json?.results)
+                          ? (json.results as ServerUpload[])
+                          : [];
+                        const sel = Array.from(selected).sort((a, b) => a - b);
+                        const uploadIds: string[] = [];
+                        for (const i of sel) {
+                          const p = previews[i];
+                          if (!p) continue;
+                          const match = serverResults.find(
+                            (s: ServerUpload) =>
+                              (p.token && s.token === p.token) ||
+                              (s.url && p.url === s.url),
+                          );
+                          if (match?.id) uploadIds.push(match.id);
+                        }
+                        const createRes = await fetch("/api/albums", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            name: name.trim(),
+                            uploadIds,
+                          }),
+                        });
+                        const createJson = await createRes.json();
+                        if (!createJson?.ok) {
+                          toast({
+                            variant: "destructive",
+                            title: "Could not create album",
+                          });
+                          return;
+                        }
+                        toast({ title: "Album created" });
+                        router.replace("/albums");
+                      } catch (err) {
+                        console.error(err);
+                        toast({
+                          variant: "destructive",
+                          title: "Create album failed",
+                        });
+                      }
+                    }}
+                    disabled={selected.size === 0}
+                  >
+                    Create Album
+                  </Button>
+                  <Button
+                    className="bg-[#F15087] text-white hover:bg-[#e03a73]"
+                    onClick={() => router.push("/albums")}
+                  >
+                    Add to Existing Album
+                  </Button>
                 </div>
               ) : (
                 <>
                   <Button
-                    variant="ghost"
+                    className="bg-[#F15087] text-white hover:bg-[#e03a73]"
                     onClick={() => inputRef.current?.click()}
                   >
-                    <Upload className="mr-2 h-4 w-4" /> Upload a Memory
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleSignOut}
-                    disabled={isSigningOut}
-                  >
-                    {isSigningOut ? (
-                      <>
-                        <LogOut className="mr-2 h-4 w-4 animate-spin" /> Signing
-                        out...
-                      </>
-                    ) : (
-                      <>
-                        <LogOut className="mr-2 h-4 w-4" /> Sign out
-                      </>
-                    )}
+                    <Upload className="mr-2 h-4 w-4 " /> Upload a Memory
                   </Button>
                 </>
               )}
@@ -516,9 +544,8 @@ const Dashboard: React.FC<Props> = () => {
                 return items.map((p, idx) => (
                   <div
                     key={idx}
-                    className="group break-inside-avoid mb-4 rounded-lg overflow-hidden relative cursor-pointer"
+                    className={`group break-inside-avoid mb-4 rounded-lg overflow-hidden relative cursor-pointer ${selected.has(idx) ? "ring-4 ring-offset-0 ring-[#F15087]" : ""}`}
                     onClick={async () => {
-                      // If any items are selected, clicking an image toggles its selection
                       if (selected.size > 0) {
                         setSelected((cur) => {
                           const next = new Set(cur);
@@ -529,7 +556,6 @@ const Dashboard: React.FC<Props> = () => {
                         return;
                       }
 
-                      // open modal on click when not in selection mode
                       if (!p) return;
                       if (p.token) {
                         setModalLoading(true);
@@ -562,7 +588,7 @@ const Dashboard: React.FC<Props> = () => {
                       className={`absolute top-2 left-2 z-10 transition-opacity ${selected.size > 0 ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <label className="flex items-center justify-center w-6 h-6 rounded-full bg-black/60 border border-stone-700 text-stone-200">
+                      <label className="flex items-center justify-center w-6 h-6 rounded-full bg-black/60 border border-stone-700 text-stone-200 hover:bg-stone-700/60 transition-colors">
                         <input
                           type="checkbox"
                           className="sr-only"
@@ -577,7 +603,7 @@ const Dashboard: React.FC<Props> = () => {
                           }}
                         />
                         <span
-                          className={`pointer-events-none w-4 h-4 rounded-full border border-stone-300 flex items-center justify-center text-xs ${selected.has(idx) ? "bg-white text-black" : ""}`}
+                          className={`pointer-events-none w-4 h-4 rounded-full border border-stone-300 flex items-center justify-center text-xs transition-colors ${selected.has(idx) ? "bg-[#F15087] text-white border-[#F15087]" : ""}`}
                         >
                           {selected.has(idx) ? "✓" : ""}
                         </span>
@@ -601,6 +627,10 @@ const Dashboard: React.FC<Props> = () => {
                       />
                     )}
 
+                    <div
+                      aria-hidden
+                      className={`absolute inset-0 pointer-events-none transition-opacity ${selected.has(idx) ? "bg-gray-500/30 opacity-100" : "opacity-0 group-hover:opacity-0"}`}
+                    />
                     {/* removed per-photo action buttons; actions now in top bar when selecting */}
                   </div>
                 ));
