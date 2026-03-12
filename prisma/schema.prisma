@@ -24,6 +24,7 @@ model User {
   sessions      Session[]
   accounts      Account[]
   uploads       Upload[]
+  albums        Album[]
 
   @@unique([email])
   @@map("user")
@@ -75,14 +76,28 @@ model Verification {
 }
 
 model Upload {
-  id           String   @id @map("_id") @default(auto()) @db.ObjectId
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
   userId       String
   publicId     String
   url          String
   resourceType String
+  albumId      String?   @db.ObjectId
   createdAt    DateTime
   updatedAt    DateTime?
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  album        Album?    @relation(fields: [albumId], references: [id])
 
   @@map("upload")
+}
+
+model Album {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String
+  name      String
+  createdAt DateTime
+  updatedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uploads   Upload[]
+
+  @@map("album")
 }

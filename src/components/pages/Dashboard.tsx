@@ -4,7 +4,7 @@ import Image from "next/image";
 // Link and sidebar icons removed — sidebar is now global
 import { Button } from "@/components/ui/button";
 import { LogOut, Upload } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { authClient } from "@/lib/auth-client";
 // Logo moved to Sidebar component
@@ -27,15 +27,18 @@ type Props = {
 const Dashboard: React.FC<Props> = () => {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [previews, setPreviews] = useState<
-    Array<{ url: string; type: string; token?: string }>
+    Array<{ id?: string; url: string; type: string; token?: string }>
   >([]);
   const [loading, setLoading] = useState(true);
   const [modalUrl, setModalUrl] = useState<string | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [albumName, setAlbumName] = useState<string>("");
   const inputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const selectMode = Boolean(searchParams?.get("selectForAlbum"));
 
   // Use the actual return type of the `toast` helper so our casts match
   // the implementation in `src/hooks/use-toast.ts`.
@@ -58,6 +61,7 @@ const Dashboard: React.FC<Props> = () => {
               | {
                   ok?: boolean;
                   results?: Array<{
+                    id?: string;
                     url?: string;
                     resourceType?: string;
                     token?: string;
@@ -68,6 +72,7 @@ const Dashboard: React.FC<Props> = () => {
 
             if (uploadsJson?.ok && Array.isArray(uploadsJson.results)) {
               const ups = uploadsJson.results.map((r) => ({
+                id: String(r.id ?? ""),
                 url: String(r.url ?? ""),
                 type:
                   r.resourceType === "video" ||
@@ -209,11 +214,13 @@ const Dashboard: React.FC<Props> = () => {
                   }
 
                   const newPreviews: Array<{
+                    id?: string;
                     url: string;
                     type: string;
                     token?: string;
                   }> = Array.isArray(json.results)
                     ? json.results.map((r) => ({
+                        id: String(r.id ?? ""),
                         url: String(r.url ?? ""),
                         type:
                           r.resourceType === "video" ||
@@ -223,7 +230,25 @@ const Dashboard: React.FC<Props> = () => {
                         token: r.token,
                       }))
                     : [];
-                  setPreviews((p) => [...newPreviews, ...p]);
+
+                  // Prepend new uploads. If in select-mode, auto-select the newly uploaded items
+                  setPreviews((p) => {
+                    const combined = [...newPreviews, ...p];
+                    // update selection to shift existing indexes and include new ones
+                    if (selectMode && newPreviews.length > 0) {
+                      setSelected((cur) => {
+                        const next = new Set<number>();
+                        // shift existing selections by newPreviews length
+                        for (const idx of cur)
+                          next.add(idx + newPreviews.length);
+                        // select all newly uploaded
+                        for (let i = 0; i < newPreviews.length; i++)
+                          next.add(i);
+                        return next;
+                      });
+                    }
+                    return combined;
+                  });
                   uploadingToast?.update?.({
                     id: uploadingToast.id,
                     title: "Upload complete",
@@ -251,7 +276,85 @@ const Dashboard: React.FC<Props> = () => {
             />
 
             <div className="flex items-center gap-3">
-              {selected.size > 0 ? (
+              {selectMode ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Album name"
+                    value={albumName}
+                    onChange={(e) => setAlbumName(e.target.value)}
+                    className="bg-stone-800 border border-stone-700 text-stone-200 px-3 py-2 rounded-md"
+                  />
+                  <Button
+                    variant="ghost"
+                    onClick={() => inputRef.current?.click()}
+                  >
+                    <Upload className="mr-2 h-4 w-4" /> Upload
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (!albumName.trim()) {
+                        toast({ title: "Please provide an album name" });
+                        return;
+                      }
+                      try {
+                        // fetch latest uploads from server to map ids
+                        const res = await fetch("/api/uploads");
+                        const json = await res.json();
+                        const serverResults = Array.isArray(json?.results)
+                          ? json.results
+                          : [];
+                        const sel = Array.from(selected).sort((a, b) => a - b);
+                        const uploadIds: string[] = [];
+                        for (const i of sel) {
+                          const p = previews[i];
+                          if (!p) continue;
+                          const match = serverResults.find(
+                            (s: any) =>
+                              (p.token && s.token === p.token) ||
+                              (s.url && p.url === s.url),
+                          );
+                          if (match?.id) uploadIds.push(match.id);
+                        }
+
+                        const createRes = await fetch("/api/albums", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            name: albumName.trim(),
+                            uploadIds,
+                          }),
+                        });
+                        const createJson = await createRes.json();
+                        if (!createJson?.ok) {
+                          toast({
+                            variant: "destructive",
+                            title: "Could not create album",
+                          });
+                          return;
+                        }
+                        toast({ title: "Album created" });
+                        router.replace("/albums");
+                      } catch (err) {
+                        console.error("Create album error", err);
+                        toast({
+                          variant: "destructive",
+                          title: "Create album failed",
+                        });
+                      }
+                    }}
+                    disabled={selected.size === 0}
+                  >
+                    Create album
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push("/albums")}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : selected.size > 0 ? (
                 <div className="flex items-center gap-2">
                   <div className="text-stone-200">{selected.size} selected</div>
                   <Button
