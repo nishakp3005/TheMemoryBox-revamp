@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import Link from "next/link";
+import DeleteAlbumSection from "@/components/Albums/DeleteAlbumSection";
+import UploadToAlbumButton from "@/components/Albums/UploadToAlbumButton";
+// client-side delete UI is implemented in a separate client component
 
 type Params = {
   params: {
@@ -46,9 +49,18 @@ export default async function AlbumDetailPage({ params }: Params) {
           <p className="text-stone-400 mt-2">{album.uploads.length} photos</p>
         </div>
         <div>
-          <Link href="/albums">
-            <button className="px-3 py-1 rounded-md border">Back</button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <UploadToAlbumButton albumId={album.id} />
+            <Link href={`/dashboard?selectForAlbum=true&albumId=${album.id}`}>
+              <button className="px-3 py-1 rounded-md border">
+                Select from dashboard
+              </button>
+            </Link>
+            <DeleteAlbumSection albumId={album.id} albumName={album.name} />
+            <Link href="/albums">
+              <button className="px-3 py-1 rounded-md border">Back</button>
+            </Link>
+          </div>
         </div>
       </div>
 
