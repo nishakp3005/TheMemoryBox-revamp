@@ -4,7 +4,14 @@ import Image from "next/image";
 import JSZip from "jszip";
 // Link and sidebar icons removed — sidebar is now global
 import { Button } from "@/components/ui/button";
-import { Download, Share2, Trash2, Upload } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Share2,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 // Logo moved to Sidebar component
@@ -37,8 +44,10 @@ const Dashboard: React.FC<Props> = () => {
   const [loading, setLoading] = useState(true);
   const [modalUrl, setModalUrl] = useState<string | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
+  const [modalIndex, setModalIndex] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [isDownloading, setIsDownloading] = useState(false);
+  const modalResolvedUrlCache = useRef<Map<number, string>>(new Map());
 
   const [albumName, setAlbumName] = useState<string>("");
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -108,6 +117,69 @@ const Dashboard: React.FC<Props> = () => {
     a.click();
     a.remove();
     URL.revokeObjectURL(blobUrl);
+  };
+
+  const closeModal = () => {
+    setModalIndex(null);
+    setModalUrl(null);
+    setModalLoading(false);
+  };
+
+  const resolvePreviewUrl = async (item: {
+    url: string;
+    token?: string;
+  }): Promise<string | null> => {
+    if (item.token) {
+      const res = await fetch(
+        `/api/uploads/asset?token=${encodeURIComponent(item.token)}`,
+      );
+      const j = await res.json();
+      return j?.url ? String(j.url) : null;
+    }
+    return item.url || null;
+  };
+
+  const openModalAtIndex = async (index: number) => {
+    if (index < 0 || index >= previews.length) return;
+    const item = previews[index];
+    if (!item) return;
+
+    setModalIndex(index);
+    const cached = modalResolvedUrlCache.current.get(index);
+    if (cached) {
+      setModalUrl(cached);
+      setModalLoading(false);
+      return;
+    }
+
+    setModalLoading(true);
+    try {
+      const resolved = await resolvePreviewUrl(item);
+      if (resolved) {
+        modalResolvedUrlCache.current.set(index, resolved);
+        setModalUrl(resolved);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Could not load image",
+        });
+      }
+    } catch (err) {
+      console.error("Fetch asset error", err);
+      toast({
+        variant: "destructive",
+        title: "Could not load image",
+      });
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const navigateModal = async (step: -1 | 1) => {
+    if (modalIndex === null) return;
+    const next = modalIndex + step;
+    if (next < 0 || next >= previews.length) return;
+    await openModalAtIndex(next);
   };
 
   // Use the actual return type of the `toast` helper so our casts match
@@ -190,6 +262,37 @@ const Dashboard: React.FC<Props> = () => {
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [selected, previews]);
+
+  useEffect(() => {
+    if (modalIndex === null) return;
+
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === "ArrowLeft") {
+        ev.preventDefault();
+        void navigateModal(-1);
+      } else if (ev.key === "ArrowRight") {
+        ev.preventDefault();
+        void navigateModal(1);
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        closeModal();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [modalIndex, previews]);
+
+  useEffect(() => {
+    if (previews.length === 0) {
+      closeModal();
+      modalResolvedUrlCache.current.clear();
+      return;
+    }
+    if (modalIndex !== null && modalIndex >= previews.length) {
+      closeModal();
+    }
+  }, [previews, modalIndex]);
 
   return (
     <>
@@ -741,33 +844,8 @@ const Dashboard: React.FC<Props> = () => {
                         });
                         return;
                       }
-
                       if (!p) return;
-                      if (p.token) {
-                        setModalLoading(true);
-                        try {
-                          const res = await fetch(
-                            `/api/uploads/asset?token=${encodeURIComponent(p.token)}`,
-                          );
-                          const j = await res.json();
-                          if (j?.url) setModalUrl(j.url);
-                          else
-                            toast({
-                              variant: "destructive",
-                              title: "Could not load image",
-                            });
-                        } catch (err) {
-                          console.error("Fetch asset error", err);
-                          toast({
-                            variant: "destructive",
-                            title: "Could not load image",
-                          });
-                        } finally {
-                          setModalLoading(false);
-                        }
-                      } else {
-                        setModalUrl(p.url);
-                      }
+                      await openModalAtIndex(idx);
                     }}
                   >
                     <div
@@ -823,31 +901,54 @@ const Dashboard: React.FC<Props> = () => {
               })()}
         </section>
         {/* Modal / Popup for viewing images */}
-        {modalUrl !== null && (
+        {modalIndex !== null && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-            onClick={() => setModalUrl(null)}
+            onClick={closeModal}
           >
             <div
               className="max-w-4xl max-h-[90vh] p-4 bg-transparent"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="relative">
-                {modalLoading ? (
+                {modalLoading && !modalUrl ? (
                   <div className="w-[800px] h-[600px] bg-stone-800 animate-pulse" />
-                ) : (
+                ) : modalUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
+                    key={`modal-image-${modalIndex}`}
                     src={modalUrl}
                     alt="preview"
-                    className="max-w-full max-h-[80vh] rounded-md shadow-lg"
+                    className={`max-w-full max-h-[80vh] rounded-md shadow-lg transition-opacity duration-200 ${modalLoading ? "opacity-60" : "opacity-100"}`}
                   />
-                )}
+                ) : null}
+
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/35 hover:bg-black/55 text-white disabled:opacity-30"
+                  onClick={() => void navigateModal(-1)}
+                  disabled={modalIndex <= 0}
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/35 hover:bg-black/55 text-white disabled:opacity-30"
+                  onClick={() => void navigateModal(1)}
+                  disabled={modalIndex >= previews.length - 1}
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </Button>
                 <Button
                   size="sm"
                   variant="ghost"
                   className="absolute top-2 right-2"
-                  onClick={() => setModalUrl(null)}
+                  onClick={closeModal}
                 >
                   Close
                 </Button>
