@@ -1,9 +1,10 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import JSZip from "jszip";
 // Link and sidebar icons removed — sidebar is now global
 import { Button } from "@/components/ui/button";
-import { Upload } from "lucide-react";
+import { Download, Share2, Trash2, Upload } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 // Logo moved to Sidebar component
@@ -37,6 +38,7 @@ const Dashboard: React.FC<Props> = () => {
   const [modalUrl, setModalUrl] = useState<string | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const [albumName, setAlbumName] = useState<string>("");
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -44,6 +46,69 @@ const Dashboard: React.FC<Props> = () => {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const selectMode = Boolean(searchParams?.get("selectForAlbum"));
+
+  const getFileNameFromUrl = (url: string, fallbackBase: string): string => {
+    try {
+      const parsed = new URL(url, window.location.origin);
+      const raw = decodeURIComponent(parsed.pathname.split("/").pop() || "");
+      const safe = raw.replace(/[\\/:*?"<>|]/g, "_").trim();
+      if (safe) return safe;
+    } catch {
+      // fallback below
+    }
+    return `${fallbackBase}.jpg`;
+  };
+
+  const getExtensionFromMime = (mime?: string): string => {
+    if (!mime) return "";
+    if (mime === "image/jpeg") return ".jpg";
+    if (mime === "image/png") return ".png";
+    if (mime === "image/webp") return ".webp";
+    if (mime === "image/gif") return ".gif";
+    if (mime === "image/avif") return ".avif";
+    if (mime === "video/mp4") return ".mp4";
+    if (mime === "video/webm") return ".webm";
+    if (mime === "video/ogg") return ".ogg";
+    return "";
+  };
+
+  const ensureExtension = (
+    filename: string,
+    mimeType: string,
+    fallbackType: string,
+  ): string => {
+    if (/\.[a-z0-9]{2,5}$/i.test(filename)) return filename;
+    const ext =
+      getExtensionFromMime(mimeType) ||
+      (fallbackType === "video" ? ".mp4" : ".jpg");
+    return `${filename}${ext}`;
+  };
+
+  const makeUniqueFileName = (
+    filename: string,
+    seen: Map<string, number>,
+  ): string => {
+    const current = seen.get(filename) ?? 0;
+    seen.set(filename, current + 1);
+    if (current === 0) return filename;
+
+    const dot = filename.lastIndexOf(".");
+    if (dot <= 0) return `${filename} (${current + 1})`;
+    const name = filename.slice(0, dot);
+    const ext = filename.slice(dot);
+    return `${name} (${current + 1})${ext}`;
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
+  };
 
   // Use the actual return type of the `toast` helper so our casts match
   // the implementation in `src/hooks/use-toast.ts`.
@@ -343,7 +408,7 @@ const Dashboard: React.FC<Props> = () => {
                 <div className="flex items-center gap-2">
                   <div className="text-stone-200">{selected.size} selected</div>
                   <Button
-                    variant="ghost"
+                    className="bg-[#F15087] text-white hover:bg-[#e03a73]"
                     onClick={() => {
                       if (previews.length === 0) return;
                       if (selected.size < previews.length) {
@@ -358,6 +423,9 @@ const Dashboard: React.FC<Props> = () => {
                       : "Deselect all"}
                   </Button>
                   <Button
+                    className="bg-[#F15087] text-white hover:bg-[#e03a73]"
+                    aria-label="Share selected"
+                    title="Share selected"
                     onClick={async () => {
                       try {
                         const urls: string[] = [];
@@ -390,10 +458,127 @@ const Dashboard: React.FC<Props> = () => {
                       }
                     }}
                   >
-                    Share
+                    <Share2 className="h-4 w-4" />
+                    <span className="sr-only">Share selected</span>
                   </Button>
                   <Button
                     className="bg-[#F15087] text-white hover:bg-[#e03a73]"
+                    aria-label={
+                      isDownloading
+                        ? "Downloading selected"
+                        : "Download selected"
+                    }
+                    title={
+                      isDownloading
+                        ? "Downloading selected"
+                        : "Download selected"
+                    }
+                    onClick={async () => {
+                      if (selected.size === 0 || isDownloading) return;
+                      setIsDownloading(true);
+                      try {
+                        const sel = Array.from(selected).sort((a, b) => a - b);
+                        const seenNames = new Map<string, number>();
+                        const filesForZip: Array<{ name: string; blob: Blob }> =
+                          [];
+                        let downloadedCount = 0;
+
+                        for (let order = 0; order < sel.length; order++) {
+                          const i = sel[order];
+                          const p = previews[i];
+                          if (!p) continue;
+
+                          let resolvedUrl = p.url;
+                          if (p.token) {
+                            const assetRes = await fetch(
+                              `/api/uploads/asset?token=${encodeURIComponent(p.token)}`,
+                            );
+                            const assetJson = await assetRes.json();
+                            if (assetJson?.url)
+                              resolvedUrl = String(assetJson.url);
+                          }
+
+                          if (!resolvedUrl) continue;
+
+                          const fileRes = await fetch(resolvedUrl);
+                          if (!fileRes.ok) continue;
+                          const blob = await fileRes.blob();
+
+                          const baseName = getFileNameFromUrl(
+                            resolvedUrl,
+                            `memory-${order + 1}`,
+                          );
+                          const withExt = ensureExtension(
+                            baseName,
+                            blob.type,
+                            p.type,
+                          );
+                          const uniqueName = makeUniqueFileName(
+                            withExt,
+                            seenNames,
+                          );
+
+                          if (sel.length > 5) {
+                            filesForZip.push({ name: uniqueName, blob });
+                          } else {
+                            downloadBlob(blob, uniqueName);
+                          }
+                          downloadedCount += 1;
+                        }
+
+                        if (downloadedCount === 0) {
+                          toast({
+                            variant: "destructive",
+                            title: "Could not download selected files",
+                          });
+                          return;
+                        }
+
+                        if (sel.length > 5) {
+                          const zip = new JSZip();
+                          for (const file of filesForZip) {
+                            zip.file(file.name, file.blob);
+                          }
+                          const zipBlob = await zip.generateAsync({
+                            type: "blob",
+                          });
+                          const stamp = new Date().toISOString().slice(0, 10);
+                          downloadBlob(zipBlob, `memory-box-${stamp}.zip`);
+                        }
+
+                        toast({
+                          title:
+                            sel.length > 5
+                              ? `Downloaded ZIP with ${downloadedCount} files`
+                              : downloadedCount === 1
+                                ? "Downloaded 1 file"
+                                : `Downloaded ${downloadedCount} files`,
+                        });
+                      } catch (err) {
+                        console.error("Download error", err);
+                        toast({
+                          variant: "destructive",
+                          title: "Download failed",
+                        });
+                      } finally {
+                        setIsDownloading(false);
+                      }
+                    }}
+                    disabled={selected.size === 0 || isDownloading}
+                  >
+                    <Download
+                      className={`h-4 w-4 ${isDownloading ? "animate-pulse" : ""}`}
+                    />
+                    <span className="sr-only">
+                      {isDownloading
+                        ? "Downloading selected"
+                        : "Download selected"}
+                    </span>
+                  </Button>
+                  <Button
+                    className="bg-[#F15087] text-white hover:bg-[#e03a73]"
+                    aria-label="Delete selected"
+                    title="Delete selected"
                     onClick={async () => {
                       if (
                         !confirm(
@@ -431,10 +616,11 @@ const Dashboard: React.FC<Props> = () => {
                       }
                     }}
                   >
-                    Delete
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Delete selected</span>
                   </Button>
                   <Button
-                    variant="ghost"
+                    className="bg-[#F15087] text-white hover:bg-[#e03a73]"
                     onClick={async () => {
                       const name = window.prompt("Create album name:");
                       if (!name || !name.trim()) return;
