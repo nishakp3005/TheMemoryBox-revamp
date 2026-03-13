@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useCallback, useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import JSZip from "jszip";
 // Link and sidebar icons removed — sidebar is now global
@@ -8,6 +8,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Eye,
+  EyeOff,
   Share2,
   Trash2,
   Upload,
@@ -30,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 type Props = {
   username?: string;
   userEmail?: string;
+  mode?: "visible" | "hidden";
 };
 type ServerUpload = {
   id?: string;
@@ -37,7 +40,7 @@ type ServerUpload = {
   resourceType?: string;
   token?: string;
 };
-const Dashboard: React.FC<Props> = () => {
+const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
   const [previews, setPreviews] = useState<
     Array<{ id?: string; url: string; type: string; token?: string }>
   >([]);
@@ -55,6 +58,7 @@ const Dashboard: React.FC<Props> = () => {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const selectMode = Boolean(searchParams?.get("selectForAlbum"));
+  const isHiddenView = mode === "hidden";
 
   const getFileNameFromUrl = (url: string, fallbackBase: string): string => {
     try {
@@ -125,62 +129,68 @@ const Dashboard: React.FC<Props> = () => {
     setModalLoading(false);
   };
 
-  const resolvePreviewUrl = async (item: {
-    url: string;
-    token?: string;
-  }): Promise<string | null> => {
-    if (item.token) {
-      const res = await fetch(
-        `/api/uploads/asset?token=${encodeURIComponent(item.token)}`,
-      );
-      const j = await res.json();
-      return j?.url ? String(j.url) : null;
-    }
-    return item.url || null;
-  };
+  const resolvePreviewUrl = useCallback(
+    async (item: { url: string; token?: string }): Promise<string | null> => {
+      if (item.token) {
+        const res = await fetch(
+          `/api/uploads/asset?token=${encodeURIComponent(item.token)}`,
+        );
+        const j = await res.json();
+        return j?.url ? String(j.url) : null;
+      }
+      return item.url || null;
+    },
+    [],
+  );
 
-  const openModalAtIndex = async (index: number) => {
-    if (index < 0 || index >= previews.length) return;
-    const item = previews[index];
-    if (!item) return;
+  const openModalAtIndex = useCallback(
+    async (index: number) => {
+      if (index < 0 || index >= previews.length) return;
+      const item = previews[index];
+      if (!item) return;
 
-    setModalIndex(index);
-    const cached = modalResolvedUrlCache.current.get(index);
-    if (cached) {
-      setModalUrl(cached);
-      setModalLoading(false);
-      return;
-    }
+      setModalIndex(index);
+      const cached = modalResolvedUrlCache.current.get(index);
+      if (cached) {
+        setModalUrl(cached);
+        setModalLoading(false);
+        return;
+      }
 
-    setModalLoading(true);
-    try {
-      const resolved = await resolvePreviewUrl(item);
-      if (resolved) {
-        modalResolvedUrlCache.current.set(index, resolved);
-        setModalUrl(resolved);
-      } else {
+      setModalLoading(true);
+      try {
+        const resolved = await resolvePreviewUrl(item);
+        if (resolved) {
+          modalResolvedUrlCache.current.set(index, resolved);
+          setModalUrl(resolved);
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Could not load image",
+          });
+        }
+      } catch (err) {
+        console.error("Fetch asset error", err);
         toast({
           variant: "destructive",
           title: "Could not load image",
         });
+      } finally {
+        setModalLoading(false);
       }
-    } catch (err) {
-      console.error("Fetch asset error", err);
-      toast({
-        variant: "destructive",
-        title: "Could not load image",
-      });
-    } finally {
-      setModalLoading(false);
-    }
-  };
+    },
+    [previews, resolvePreviewUrl, toast],
+  );
 
-  const navigateModal = async (step: -1 | 1) => {
-    if (modalIndex === null) return;
-    const next = modalIndex + step;
-    if (next < 0 || next >= previews.length) return;
-    await openModalAtIndex(next);
-  };
+  const navigateModal = useCallback(
+    async (step: -1 | 1) => {
+      if (modalIndex === null) return;
+      const next = modalIndex + step;
+      if (next < 0 || next >= previews.length) return;
+      await openModalAtIndex(next);
+    },
+    [modalIndex, previews.length, openModalAtIndex],
+  );
 
   // Use the actual return type of the `toast` helper so our casts match
   // the implementation in `src/hooks/use-toast.ts`.
@@ -190,6 +200,11 @@ const Dashboard: React.FC<Props> = () => {
     let mounted = true;
     (async () => {
       try {
+        if (mounted) {
+          setLoading(true);
+          setSelected(new Set());
+          closeModal();
+        }
         const res = await fetch("/api/session");
         const json = await res.json();
         if (mounted && !json?.user) {
@@ -198,7 +213,9 @@ const Dashboard: React.FC<Props> = () => {
         // If user is signed in, fetch their uploads to show on dashboard
         if (mounted && json?.user) {
           try {
-            const uploadsRes = await fetch("/api/uploads");
+            const uploadsRes = await fetch(
+              isHiddenView ? "/api/uploads?hidden=only" : "/api/uploads",
+            );
             const uploadsJson = (await uploadsRes.json()) as
               | {
                   ok?: boolean;
@@ -224,6 +241,10 @@ const Dashboard: React.FC<Props> = () => {
                 token: r.token,
               }));
               setPreviews(ups);
+              modalResolvedUrlCache.current.clear();
+            } else {
+              setPreviews([]);
+              modalResolvedUrlCache.current.clear();
             }
           } catch (err) {
             console.error("Error fetching uploads", err);
@@ -240,7 +261,7 @@ const Dashboard: React.FC<Props> = () => {
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, [router, isHiddenView]);
 
   // Keyboard handlers: Escape to clear selection, Ctrl/Cmd+A to select all
   useEffect(() => {
@@ -281,7 +302,7 @@ const Dashboard: React.FC<Props> = () => {
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [modalIndex, previews]);
+  }, [modalIndex, previews, navigateModal]);
 
   useEffect(() => {
     if (previews.length === 0) {
@@ -678,6 +699,143 @@ const Dashboard: React.FC<Props> = () => {
                         : "Download selected"}
                     </span>
                   </Button>
+                  {isHiddenView ? (
+                    <Button
+                      className="bg-[#F15087] text-white hover:bg-[#e03a73]"
+                      aria-label="Restore selected"
+                      title="Restore selected"
+                      onClick={async () => {
+                        if (selected.size === 0) return;
+                        try {
+                          const sel = Array.from(selected).sort(
+                            (a, b) => b - a,
+                          );
+                          const tokens = sel
+                            .map((i) => previews[i]?.token)
+                            .filter(
+                              (t): t is string =>
+                                typeof t === "string" && t.length > 0,
+                            );
+
+                          if (tokens.length === 0) {
+                            toast({ title: "No restorable assets found" });
+                            return;
+                          }
+
+                          const res = await fetch("/api/uploads/unhide", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ tokens }),
+                          });
+                          const json = (await res.json()) as {
+                            ok?: boolean;
+                            restoredCount?: number;
+                            error?: string;
+                          };
+
+                          if (!res.ok || !json?.ok) {
+                            toast({
+                              variant: "destructive",
+                              title: "Could not restore selected images",
+                              description: json?.error,
+                            });
+                            return;
+                          }
+
+                          setPreviews((cur) =>
+                            cur.filter((_, idx) => !selected.has(idx)),
+                          );
+                          setSelected(new Set());
+
+                          const count = json.restoredCount ?? tokens.length;
+                          toast({
+                            title:
+                              count === 1
+                                ? "1 image restored"
+                                : `${count} images restored`,
+                          });
+                        } catch (err) {
+                          console.error("Restore error", err);
+                          toast({
+                            variant: "destructive",
+                            title: "Restore failed",
+                          });
+                        }
+                      }}
+                      disabled={selected.size === 0}
+                    >
+                      <Eye className="h-4 w-4" />
+                      <span className="sr-only">Restore selected</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      className="bg-[#F15087] text-white hover:bg-[#e03a73]"
+                      aria-label="Hide selected"
+                      title="Hide selected"
+                      onClick={async () => {
+                        if (selected.size === 0) return;
+                        try {
+                          const sel = Array.from(selected).sort(
+                            (a, b) => b - a,
+                          );
+                          const tokens = sel
+                            .map((i) => previews[i]?.token)
+                            .filter(
+                              (t): t is string =>
+                                typeof t === "string" && t.length > 0,
+                            );
+
+                          if (tokens.length === 0) {
+                            toast({ title: "No hideable assets found" });
+                            return;
+                          }
+
+                          const res = await fetch("/api/uploads/hide", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ tokens }),
+                          });
+                          const json = (await res.json()) as {
+                            ok?: boolean;
+                            hiddenCount?: number;
+                            error?: string;
+                          };
+
+                          if (!res.ok || !json?.ok) {
+                            toast({
+                              variant: "destructive",
+                              title: "Could not hide selected images",
+                              description: json?.error,
+                            });
+                            return;
+                          }
+
+                          setPreviews((cur) =>
+                            cur.filter((_, idx) => !selected.has(idx)),
+                          );
+                          setSelected(new Set());
+
+                          const count = json.hiddenCount ?? tokens.length;
+                          toast({
+                            title:
+                              count === 1
+                                ? "1 image hidden"
+                                : `${count} images hidden`,
+                          });
+                        } catch (err) {
+                          console.error("Hide error", err);
+                          toast({
+                            variant: "destructive",
+                            title: "Hide failed",
+                          });
+                        }
+                      }}
+                      disabled={selected.size === 0}
+                    >
+                      <EyeOff className="h-4 w-4" />
+                      <span className="sr-only">Hide selected</span>
+                    </Button>
+                  )}
                   <Button
                     className="bg-[#F15087] text-white hover:bg-[#e03a73]"
                     aria-label="Delete selected"
@@ -824,7 +982,9 @@ const Dashboard: React.FC<Props> = () => {
                   return (
                     <div className="col-span-full py-5 text-center text-stone-400">
                       <p className="text-2xl text-stone-200 mb-2">
-                        No memories yet
+                        {isHiddenView
+                          ? "No hidden memories"
+                          : "No memories yet"}
                       </p>
                     </div>
                   );

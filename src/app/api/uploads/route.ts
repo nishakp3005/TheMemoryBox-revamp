@@ -137,7 +137,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const hd = await headers();
     const session = await auth.api.getSession({
@@ -146,10 +146,19 @@ export async function GET() {
     if (!session?.user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const uploads = await prisma.upload.findMany({
+    const reqUrl = new URL(req.url);
+    const hiddenParam = reqUrl.searchParams.get("hidden");
+    const onlyHidden = hiddenParam === "only";
+
+    // Query all user uploads, then apply hidden filter in JS so legacy Mongo
+    // records without an explicit isHidden field are treated as visible.
+    const uploadsAll = await prisma.upload.findMany({
       where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
     });
+    const uploads = uploadsAll.filter((u) =>
+      onlyHidden ? u.isHidden === true : u.isHidden !== true,
+    );
 
     // Return uploads (url, resourceType) and a time-limited token for the authenticated user
     const results = uploads.map((u) => ({

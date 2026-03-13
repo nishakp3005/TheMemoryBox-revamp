@@ -4,11 +4,12 @@ import { redirect } from "next/navigation";
 import Dashboard from "@/components/pages/Dashboard";
 import { auth } from "@/lib/auth";
 
-const dashboardPage = async () => {
+const hiddenPage = async () => {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) {
     redirect("/login");
   }
+
   const username = session.user?.name ?? null;
   const userEmail = session.user?.email ?? "";
 
@@ -17,9 +18,10 @@ const dashboardPage = async () => {
       <Dashboard
         username={username ?? userEmail ?? "Your"}
         userEmail={userEmail}
-        mode="visible"
+        mode="hidden"
       />
     </>
   );
 };
-export default dashboardPage;
+
+export default hiddenPage;
