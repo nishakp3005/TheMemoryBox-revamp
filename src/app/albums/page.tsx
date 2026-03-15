@@ -17,7 +17,10 @@ export default async function AlbumsPage() {
   const albums = await prisma.album.findMany({
     where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
-    include: { uploads: { take: 1, orderBy: { createdAt: "asc" } } },
+    include: {
+      uploads: { take: 3, orderBy: { createdAt: "asc" } },
+      _count: { select: { uploads: true } },
+    },
   });
 
   return (
@@ -42,9 +45,25 @@ export default async function AlbumsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {albums.map((a) => {
-            const thumb = a.uploads && a.uploads[0] ? a.uploads[0].url : null;
+            const photos = a.uploads ? a.uploads.map((u) => u.url) : [];
+            const count = a._count?.uploads ?? photos.length;
+            const createdAtLabel = a.createdAt
+              ? new Date(a.createdAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })
+              : null;
+
             return (
-              <AlbumTile key={a.id} id={a.id} name={a.name} thumb={thumb} />
+              <AlbumTile
+                key={a.id}
+                id={a.id}
+                name={a.name}
+                photos={photos}
+                count={count}
+                createdAtLabel={createdAtLabel}
+              />
             );
           })}
         </div>

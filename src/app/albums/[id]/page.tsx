@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import Link from "next/link";
 import DeleteAlbumSection from "@/components/Albums/DeleteAlbumSection";
 import UploadToAlbumButton from "@/components/Albums/UploadToAlbumButton";
+import RenameAlbumButton from "@/components/Albums/RenameAlbumButton";
 // client-side delete UI is implemented in a separate client component
 
 type Params = {
@@ -45,7 +46,10 @@ export default async function AlbumDetailPage({ params }: Params) {
     <main className="min-h-screen p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">{album.name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">{album.name}</h1>
+            <RenameAlbumButton albumId={album.id} name={album.name} />
+          </div>
           <p className="text-stone-400 mt-2">{album.uploads.length} photos</p>
         </div>
         <div>
@@ -57,6 +61,7 @@ export default async function AlbumDetailPage({ params }: Params) {
               </button>
             </Link>
             <DeleteAlbumSection albumId={album.id} albumName={album.name} />
+            <RenameAlbumButton albumId={album.id} name={album.name} />
             <Link href="/albums">
               <button className="px-3 py-1 rounded-md border">Back</button>
             </Link>

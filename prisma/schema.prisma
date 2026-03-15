@@ -95,6 +95,9 @@ model Album {
   id        String    @id @default(auto()) @map("_id") @db.ObjectId
   userId    String
   name      String
+  isProtected Boolean @default(false)
+  passwordHash String?
+  passwordSalt String?
   createdAt DateTime
   updatedAt DateTime?
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -18,9 +18,9 @@ export const metadata: Metadata = {
   title: "TheMemoryBox",
   description: "TheMemoryBox",
   icons: {
-    icon: "/logo.png",
-    shortcut: "/logo.png",
-    apple: "/logo.png",
+    icon: "/logo-dark.png",
+    shortcut: "/logo-dark.png",
+    apple: "/logo-dark.png",
   },
 };
 
