@@ -41,7 +41,7 @@ export default function RenameAlbumButton({ albumId, name }: Props) {
     <button
       onClick={handleRename}
       title="Rename album"
-      className="px-2 py-1 rounded-md border text-sm flex items-center justify-center"
+      className="px-2 py-1 rounded-md bg-pink-500 hover:bg-pink-600 text-white flex items-center justify-center"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"

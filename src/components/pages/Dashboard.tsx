@@ -58,6 +58,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const selectMode = Boolean(searchParams?.get("selectForAlbum"));
+  const albumId = String(searchParams?.get("albumId") ?? "");
   const isHiddenView = mode === "hidden";
 
   const getFileNameFromUrl = (url: string, fallbackBase: string): string => {
@@ -451,82 +452,160 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
               <div />
               {selectMode ? (
                 <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="Album name"
-                    value={albumName}
-                    onChange={(e) => setAlbumName(e.target.value)}
-                    className="bg-stone-800 border border-stone-700 text-stone-200 px-3 py-2 rounded-md"
-                  />
-                  <Button
-                    variant="ghost"
-                    onClick={() => inputRef.current?.click()}
-                  >
-                    <Upload className="mr-2 h-4 w-4" /> Upload
-                  </Button>
-                  <Button
-                    className="bg-[#F15087] text-white hover:bg-[#e03a73]"
-                    onClick={async () => {
-                      if (!albumName.trim()) {
-                        toast({ title: "Please provide an album name" });
-                        return;
-                      }
-                      try {
-                        // fetch latest uploads from server to map ids
-                        const res = await fetch("/api/uploads");
-                        const json = await res.json();
-                        const serverResults = Array.isArray(json?.results)
-                          ? (json.results as ServerUpload[])
-                          : [];
-                        const sel = Array.from(selected).sort((a, b) => a - b);
-                        const uploadIds: string[] = [];
-                        for (const i of sel) {
-                          const p = previews[i];
-                          if (!p) continue;
-                          const match = serverResults.find(
-                            (s: ServerUpload) =>
-                              (p.token && s.token === p.token) ||
-                              (s.url && p.url === s.url),
-                          );
-                          if (match?.id) uploadIds.push(match.id);
-                        }
+                  {albumId ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        onClick={() => inputRef.current?.click()}
+                      >
+                        <Upload className="mr-2 h-4 w-4" /> Upload
+                      </Button>
+                      <Button
+                        className="bg-[#F15087] text-white hover:bg-[#e03a73]"
+                        onClick={async () => {
+                          if (selected.size === 0) {
+                            toast({ title: "Select some items first" });
+                            return;
+                          }
+                          try {
+                            // fetch latest uploads from server to map ids
+                            const res = await fetch("/api/uploads");
+                            const json = await res.json();
+                            const serverResults = Array.isArray(json?.results)
+                              ? (json.results as ServerUpload[])
+                              : [];
+                            const sel = Array.from(selected).sort(
+                              (a, b) => a - b,
+                            );
+                            const uploadIds: string[] = [];
+                            for (const i of sel) {
+                              const p = previews[i];
+                              if (!p) continue;
+                              const match = serverResults.find(
+                                (s: ServerUpload) =>
+                                  (p.token && s.token === p.token) ||
+                                  (s.url && p.url === s.url),
+                              );
+                              if (match?.id) uploadIds.push(match.id);
+                            }
 
-                        const createRes = await fetch("/api/albums", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            name: albumName.trim(),
-                            uploadIds,
-                          }),
-                        });
-                        const createJson = await createRes.json();
-                        if (!createJson?.ok) {
-                          toast({
-                            variant: "destructive",
-                            title: "Could not create album",
-                          });
-                          return;
-                        }
-                        toast({ title: "Album created" });
-                        router.replace("/albums");
-                      } catch (err) {
-                        console.error("Create album error", err);
-                        toast({
-                          variant: "destructive",
-                          title: "Create album failed",
-                        });
-                      }
-                    }}
-                    disabled={selected.size === 0}
-                  >
-                    Create album
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => router.push("/albums")}
-                  >
-                    Cancel
-                  </Button>
+                            const addRes = await fetch("/api/albums/add", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ id: albumId, uploadIds }),
+                            });
+                            const addJson = await addRes.json();
+                            if (!addJson?.ok) {
+                              toast({
+                                variant: "destructive",
+                                title: "Could not add to album",
+                                description: addJson?.error,
+                              });
+                              return;
+                            }
+                            toast({ title: "Added to album" });
+                            router.replace(`/albums/${albumId}`);
+                          } catch (err) {
+                            console.error("Add to album error", err);
+                            toast({
+                              variant: "destructive",
+                              title: "Add to album failed",
+                            });
+                          }
+                        }}
+                        disabled={selected.size === 0}
+                      >
+                        Add to album
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push(`/albums/${albumId}`)}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        placeholder="Album name"
+                        value={albumName}
+                        onChange={(e) => setAlbumName(e.target.value)}
+                        className="bg-stone-800 border border-stone-700 text-stone-200 px-3 py-2 rounded-md"
+                      />
+                      <Button
+                        variant="ghost"
+                        onClick={() => inputRef.current?.click()}
+                      >
+                        <Upload className="mr-2 h-4 w-4" /> Upload
+                      </Button>
+                      <Button
+                        className="bg-[#F15087] text-white hover:bg-[#e03a73]"
+                        onClick={async () => {
+                          if (!albumName.trim()) {
+                            toast({ title: "Please provide an album name" });
+                            return;
+                          }
+                          try {
+                            // fetch latest uploads from server to map ids
+                            const res = await fetch("/api/uploads");
+                            const json = await res.json();
+                            const serverResults = Array.isArray(json?.results)
+                              ? (json.results as ServerUpload[])
+                              : [];
+                            const sel = Array.from(selected).sort(
+                              (a, b) => a - b,
+                            );
+                            const uploadIds: string[] = [];
+                            for (const i of sel) {
+                              const p = previews[i];
+                              if (!p) continue;
+                              const match = serverResults.find(
+                                (s: ServerUpload) =>
+                                  (p.token && s.token === p.token) ||
+                                  (s.url && p.url === s.url),
+                              );
+                              if (match?.id) uploadIds.push(match.id);
+                            }
+
+                            const createRes = await fetch("/api/albums", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                name: albumName.trim(),
+                                uploadIds,
+                              }),
+                            });
+                            const createJson = await createRes.json();
+                            if (!createJson?.ok) {
+                              toast({
+                                variant: "destructive",
+                                title: "Could not create album",
+                              });
+                              return;
+                            }
+                            toast({ title: "Album created" });
+                            router.replace("/albums");
+                          } catch (err) {
+                            console.error("Create album error", err);
+                            toast({
+                              variant: "destructive",
+                              title: "Create album failed",
+                            });
+                          }
+                        }}
+                        disabled={selected.size === 0}
+                      >
+                        Create album
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push("/albums")}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  )}
                 </div>
               ) : selected.size > 0 ? (
                 <div className="flex items-center gap-2">
@@ -768,73 +847,149 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                       <span className="sr-only">Restore selected</span>
                     </Button>
                   ) : (
-                    <Button
-                      className="bg-[#F15087] text-white hover:bg-[#e03a73]"
-                      aria-label="Hide selected"
-                      title="Hide selected"
-                      onClick={async () => {
-                        if (selected.size === 0) return;
-                        try {
-                          const sel = Array.from(selected).sort(
-                            (a, b) => b - a,
-                          );
-                          const tokens = sel
-                            .map((i) => previews[i]?.token)
-                            .filter(
-                              (t): t is string =>
-                                typeof t === "string" && t.length > 0,
+                    <>
+                      <Button
+                        className="bg-[#F15087] text-white hover:bg-[#e03a73]"
+                        aria-label="Hide selected"
+                        title="Hide selected"
+                        onClick={async () => {
+                          if (selected.size === 0) return;
+                          try {
+                            const sel = Array.from(selected).sort(
+                              (a, b) => b - a,
                             );
+                            const tokens = sel
+                              .map((i) => previews[i]?.token)
+                              .filter(
+                                (t): t is string =>
+                                  typeof t === "string" && t.length > 0,
+                              );
 
-                          if (tokens.length === 0) {
-                            toast({ title: "No hideable assets found" });
-                            return;
-                          }
+                            if (tokens.length === 0) {
+                              toast({ title: "No hideable assets found" });
+                              return;
+                            }
 
-                          const res = await fetch("/api/uploads/hide", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ tokens }),
-                          });
-                          const json = (await res.json()) as {
-                            ok?: boolean;
-                            hiddenCount?: number;
-                            error?: string;
-                          };
+                            const res = await fetch("/api/uploads/hide", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ tokens }),
+                            });
+                            const json = (await res.json()) as {
+                              ok?: boolean;
+                              hiddenCount?: number;
+                              error?: string;
+                            };
 
-                          if (!res.ok || !json?.ok) {
+                            if (!res.ok || !json?.ok) {
+                              toast({
+                                variant: "destructive",
+                                title: "Could not hide selected images",
+                                description: json?.error,
+                              });
+                              return;
+                            }
+
+                            setPreviews((cur) =>
+                              cur.filter((_, idx) => !selected.has(idx)),
+                            );
+                            setSelected(new Set());
+
+                            const count = json.hiddenCount ?? tokens.length;
+                            toast({
+                              title:
+                                count === 1
+                                  ? "1 image hidden"
+                                  : `${count} images hidden`,
+                            });
+                          } catch (err) {
+                            console.error("Hide error", err);
                             toast({
                               variant: "destructive",
-                              title: "Could not hide selected images",
-                              description: json?.error,
+                              title: "Hide failed",
                             });
-                            return;
                           }
+                        }}
+                        disabled={selected.size === 0}
+                      >
+                        <EyeOff className="h-4 w-4" />
+                        <span className="sr-only">Hide selected</span>
+                      </Button>
+                      <Button
+                        className="bg-[#F15087] text-white hover:bg-[#e03a73]"
+                        aria-label="Remove from album"
+                        title="Remove from album"
+                        onClick={async () => {
+                          if (selected.size === 0) return;
+                          try {
+                            const res = await fetch("/api/uploads");
+                            const json = await res.json();
+                            const serverResults = Array.isArray(json?.results)
+                              ? (json.results as ServerUpload[])
+                              : [];
+                            const sel = Array.from(selected).sort(
+                              (a, b) => a - b,
+                            );
+                            const uploadIds: string[] = [];
+                            for (const i of sel) {
+                              const p = previews[i];
+                              if (!p) continue;
+                              const match = serverResults.find(
+                                (s: ServerUpload) =>
+                                  (p.token && s.token === p.token) ||
+                                  (s.url && p.url === s.url),
+                              );
+                              if (match?.id) uploadIds.push(match.id);
+                            }
+                            if (uploadIds.length === 0) {
+                              toast({
+                                title: "No album-associated uploads found",
+                              });
+                              return;
+                            }
 
-                          setPreviews((cur) =>
-                            cur.filter((_, idx) => !selected.has(idx)),
-                          );
-                          setSelected(new Set());
+                            const rem = await fetch(
+                              "/api/uploads/remove-album",
+                              {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ uploadIds }),
+                              },
+                            );
+                            const remJson = await rem.json();
+                            if (!remJson?.ok) {
+                              toast({
+                                variant: "destructive",
+                                title: "Could not remove from album",
+                                description: remJson?.error,
+                              });
+                              return;
+                            }
 
-                          const count = json.hiddenCount ?? tokens.length;
-                          toast({
-                            title:
-                              count === 1
-                                ? "1 image hidden"
-                                : `${count} images hidden`,
-                          });
-                        } catch (err) {
-                          console.error("Hide error", err);
-                          toast({
-                            variant: "destructive",
-                            title: "Hide failed",
-                          });
-                        }
-                      }}
-                      disabled={selected.size === 0}
-                    >
-                      <EyeOff className="h-4 w-4" />
-                      <span className="sr-only">Hide selected</span>
-                    </Button>
+                            toast({ title: "Removed from album" });
+                            // clear selection after action
+                            setSelected(new Set());
+                            // refresh data
+                            try {
+                              const maybeRouter = router as unknown as {
+                                refresh?: () => void;
+                              };
+                              if (typeof maybeRouter.refresh === "function")
+                                maybeRouter.refresh();
+                            } catch {}
+                          } catch (err) {
+                            console.error("Remove from album error", err);
+                            toast({
+                              variant: "destructive",
+                              title: "Remove failed",
+                            });
+                          }
+                        }}
+                        disabled={selected.size === 0}
+                      >
+                        Remove from album
+                      </Button>
+                    </>
                   )}
                   <Button
                     className="bg-[#F15087] text-white hover:bg-[#e03a73]"

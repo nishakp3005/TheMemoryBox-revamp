@@ -3,9 +3,9 @@ import React, { useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 
-type Props = { albumId: string };
+type Props = { albumId: string; className?: string };
 
-export default function UploadToAlbumButton({ albumId }: Props) {
+export default function UploadToAlbumButton({ albumId, className }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
   const router = useRouter();
@@ -61,7 +61,7 @@ export default function UploadToAlbumButton({ albumId }: Props) {
       />
       <button
         onClick={() => inputRef.current?.click()}
-        className="px-3 py-1 rounded-md border mr-2"
+        className={className ?? "px-3 py-1 rounded-md border mr-2"}
       >
         Upload from computer
       </button>

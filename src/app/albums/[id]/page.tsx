@@ -7,6 +7,9 @@ import Link from "next/link";
 import DeleteAlbumSection from "@/components/Albums/DeleteAlbumSection";
 import UploadToAlbumButton from "@/components/Albums/UploadToAlbumButton";
 import RenameAlbumButton from "@/components/Albums/RenameAlbumButton";
+import RemoveFromAlbumButton from "@/components/Albums/RemoveFromAlbumButton";
+import ProtectedAlbumContent from "@/components/Albums/ProtectedAlbumContent";
+import AlbumView from "@/components/Albums/AlbumView";
 // client-side delete UI is implemented in a separate client component
 
 type Params = {
@@ -24,10 +27,15 @@ export default async function AlbumDetailPage({ params }: Params) {
 
   const { id } = (await params) as unknown as { id: string };
 
-  const album = await prisma.album.findUnique({
-    where: { id },
-    include: { uploads: { orderBy: { createdAt: "desc" } } },
-  });
+  // If album is protected, do not load uploads server-side.
+  const album = await prisma.album.findUnique({ where: { id } });
+  let uploads: any[] = [];
+  if (album && !album.isProtected) {
+    uploads = await prisma.upload.findMany({
+      where: { albumId: id },
+      orderBy: { createdAt: "desc" },
+    });
+  }
 
   if (!album) {
     return (
@@ -44,51 +52,20 @@ export default async function AlbumDetailPage({ params }: Params) {
 
   return (
     <main className="min-h-screen p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">{album.name}</h1>
-            <RenameAlbumButton albumId={album.id} name={album.name} />
-          </div>
-          <p className="text-stone-400 mt-2">{album.uploads.length} photos</p>
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <UploadToAlbumButton albumId={album.id} />
-            <Link href={`/dashboard?selectForAlbum=true&albumId=${album.id}`}>
-              <button className="px-3 py-1 rounded-md border">
-                Select from dashboard
-              </button>
-            </Link>
-            <DeleteAlbumSection albumId={album.id} albumName={album.name} />
-            <RenameAlbumButton albumId={album.id} name={album.name} />
-            <Link href="/albums">
-              <button className="px-3 py-1 rounded-md border">Back</button>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {album.uploads.length === 0 ? (
+      {album.isProtected ? (
+        <ProtectedAlbumContent albumId={album.id} />
+      ) : uploads.length === 0 ? (
         <div className="text-stone-400">No photos in this album yet.</div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {album.uploads.map((u) => (
-            <a
-              key={u.id}
-              href={u.url}
-              target="_blank"
-              rel="noreferrer"
-              className="block overflow-hidden rounded"
-            >
-              <img
-                src={u.url}
-                alt={u.publicId ?? "photo"}
-                className="w-full h-40 object-cover"
-              />
-            </a>
-          ))}
-        </div>
+        <AlbumView
+          albumId={album.id}
+          albumName={album.name}
+          uploads={uploads.map((u) => ({
+            id: String(u.id),
+            url: String(u.url),
+            publicId: String(u.publicId ?? ""),
+          }))}
+        />
       )}
     </main>
   );

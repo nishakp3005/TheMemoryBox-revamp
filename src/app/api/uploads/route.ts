@@ -30,6 +30,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No files" }, { status: 400 });
 
     const results: Array<{
+      id?: string;
       token: string;
       publicId: string;
       url: string;
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
         }
       }
 
-      await prisma.upload.create({
+      const created = await prisma.upload.create({
         data: {
           userId: session.user.id,
           publicId: upload.public_id as string,
@@ -107,6 +108,7 @@ export async function POST(request: Request) {
         userId: session.user.id,
       });
       results.push({
+        id: created.id,
         token,
         publicId: upload.public_id as string,
         url: upload.secure_url as string,

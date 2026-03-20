@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 
@@ -10,6 +10,15 @@ export default function DeleteAlbumSection({ albumId, albumName }: Props) {
   const [confirmName, setConfirmName] = useState("");
   const { toast } = useToast();
   const router = useRouter();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    } else {
+      setConfirmName("");
+    }
+  }, [open]);
 
   const doDelete = async () => {
     try {
@@ -20,10 +29,16 @@ export default function DeleteAlbumSection({ albumId, albumName }: Props) {
       });
       const json = await res.json();
       if (!json?.ok) {
-        toast({
-          variant: "destructive",
-          title: json?.error ?? "Could not delete album",
-        });
+        const err = String(json?.error ?? "Could not delete album");
+        if (err === "Confirmation name does not match") {
+          toast({
+            variant: "destructive",
+            title:
+              "Album name does not match. Please enter the correct album name",
+          });
+        } else {
+          toast({ variant: "destructive", title: err });
+        }
         return;
       }
       toast({ title: "Album deleted" });
@@ -37,7 +52,7 @@ export default function DeleteAlbumSection({ albumId, albumName }: Props) {
   return (
     <div className="inline-block">
       <button
-        className="px-3 py-1 rounded-md border mr-2"
+        className="px-3 py-1 rounded-md bg-pink-500 hover:bg-pink-600 text-white mr-2"
         onClick={() => setOpen(true)}
       >
         Delete album
@@ -53,8 +68,29 @@ export default function DeleteAlbumSection({ albumId, albumName }: Props) {
               Type the album name to confirm deletion.
             </p>
             <input
+              ref={inputRef}
               value={confirmName}
               onChange={(e) => setConfirmName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const trimmed = confirmName.trim();
+                  if (trimmed === albumName) {
+                    doDelete();
+                  } else {
+                    toast({
+                      variant: "destructive",
+                      title:
+                        "Album name does not match. Please enter the correct album name",
+                    });
+                    setConfirmName("");
+                    // focus the input after clearing
+                    setTimeout(() => {
+                      (inputRef.current as HTMLInputElement | null)?.focus();
+                    }, 50);
+                  }
+                }
+              }}
               className="w-full px-3 py-2 border rounded mb-4 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 border-stone-300 dark:border-stone-700"
               placeholder="Album name"
             />
@@ -68,7 +104,7 @@ export default function DeleteAlbumSection({ albumId, albumName }: Props) {
               <button
                 className="px-3 py-1 rounded bg-red-600 text-white"
                 onClick={doDelete}
-                disabled={confirmName !== albumName}
+                disabled={confirmName.trim() !== albumName}
               >
                 Delete
               </button>
