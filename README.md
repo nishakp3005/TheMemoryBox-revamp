@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+**The Memory Box** is a modern app designed to help you preserve, relive, and share your cherished moments in style. With features like capsule creation, collaboration, gifting, and even an experimental AI-powered face detection, it’s the perfect way to keep your memories alive.
 
-## Getting Started
+![HomePage](https://github.com/user-attachments/assets/d8fa274a-b126-4605-b7ad-d25eadbdbb72)
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. **Secure Authentication**
+   - Powered by **NextAuth.js** and **NeonDB**, your memories stay private and safe.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. **Beautiful Home Page**
+   - Your photos are displayed in a clean and visually pleasing layout.
+   - Includes a handy **date picker** to revisit events on specific days.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. **Easy File Uploads**
+   - Integrated with **Cloudinary**, making it super simple to upload photos, videos, and even audio files. It takes care of compression and optimization automatically.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. **Albums & Collaboration**
+   - Group your favorite photos into albums and share them with friends or family for collaboration.
+   - Uses **Resend Mail API** and **React Email** templates to notify collaborators in style.
 
-## Learn More
+5. **Capsules for Special Moments**
+   - Turn albums into time capsules with:
+     - **Countdown timers**
+     - **Customizable themes**
+     - **Password protection**
+   - Perfect for personal goals, nostalgic keepsakes, or reminders of special events.
 
-To learn more about Next.js, take a look at the following resources:
+6. **Gift Capsules**
+   - Share your memories with loved ones by gifting them capsules.
+   - Ownership of the capsule and its album is transferred seamlessly, adding a personal touch.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+7. **ML-Based Face Detection** *(Experimental)*
+   - Automatically groups photos of the same person using machine learning techniques.
+   - Create custom videos or albums for each person based on these groups.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+8. **Modern UI/UX**
+   - A sleek and responsive design ensures an effortless user experience across devices.
 
-## Deploy on Vercel
+## Tech Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Framework:** Next.js 15 (App Router)
+- **Language:** TypeScript
+- **UI:** React 19, Tailwind CSS 3, Lucide icons, Radix UI primitives
+- **Database / ORM:** Prisma (Prisma Client + CLI)
+- **File/storage:** Cloudinary via `cloudinary` and `next-cloudinary`
+- **Authentication / Email:** Custom auth utilities, `nodemailer` for email
+- **Forms & Validation:** `react-hook-form`, `zod`, `@hookform/resolvers`
+- **Build / Tooling:** Node.js, pnpm/npm, PostCSS, Autoprefixer
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Dev / Build Tools and Libraries
+
+- ESLint for linting
+- TypeScript for type checking
+- Tailwind CSS and `tailwindcss-animate`
+- `formidable` for server-side file parsing
+- `jszip` for any zip/export features
+- `class-variance-authority`, `clsx`, and `tailwind-merge` for styling utilities
+
+## Other Tools & Services
+
+- Cloudinary (asset storage and CDN)
+
+
+That’s all for now. Relive and share your memories with **The Memory Box**!
