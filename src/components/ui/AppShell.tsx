@@ -13,7 +13,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     "/signup",
     "/forgot-password",
     "/reset-password",
-    "/email-verified",
   ];
 
   const base = "min-h-screen flex";

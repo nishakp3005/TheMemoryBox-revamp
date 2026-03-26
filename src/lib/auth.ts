@@ -11,7 +11,7 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    requireEmailVerification: false,
     sendResetPassword: async ({ user, url }) => {
       await sendEmail({
         to: user.email,
@@ -32,18 +32,6 @@ export const auth = betterAuth({
     cookieCache: {
       enabled: true,
       maxAge: 5 * 60,
-    },
-  },
-  emailVerification: {
-    sendOnSignUp: true,
-    autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, token }) => {
-      const verificationUrl = `${process.env.BETTER_AUTH_URL}/api/auth/verify-email?token=${token}&callbackURL=${process.env.EMAIL_VERIFICATION_CALLBACK_URL}`;
-      await sendEmail({
-        to: user.email,
-        subject: "Verify your email address",
-        text: `Click the link to verify your email address: ${verificationUrl}`,
-      });
     },
   },
   plugins: [nextCookies()],

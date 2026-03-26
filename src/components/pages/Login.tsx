@@ -35,7 +35,6 @@ const Login = () => {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
-    form.reset();
     await authClient.signIn.email(
       {
         email: data.email,
@@ -47,7 +46,8 @@ const Login = () => {
           setPending(true);
         },
         onSuccess: () => {
-          router.push("/");
+          form.reset();
+          router.push("/dashboard");
         },
         onError: (ctx) => {
           console.log("error", ctx);

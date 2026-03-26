@@ -13,7 +13,6 @@ export default function SidebarWrapper() {
     "/signup",
     "/forgot-password",
     "/reset-password",
-    "/email-verified",
   ];
 
   if (!pathname) return null;

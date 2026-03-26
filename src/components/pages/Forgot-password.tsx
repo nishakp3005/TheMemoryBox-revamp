@@ -34,16 +34,14 @@ const ForgotPassword = () => {
 
   const onSubmit = async (data: ForgotPasswordFormValues) => {
     setPending(true);
-    const { error } = await (
-      authClient as unknown as {
-        forgetPassword: (opts: {
-          email: string;
-          redirectTo: string;
-        }) => Promise<{ error?: { message: string } }>;
-      }
-    ).forgetPassword({
+    const redirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/reset-password`
+        : "/reset-password";
+
+    const { error } = await authClient.requestPasswordReset({
       email: data.email,
-      redirectTo: "/reset-password",
+      redirectTo,
     });
     if (error) {
       toast({

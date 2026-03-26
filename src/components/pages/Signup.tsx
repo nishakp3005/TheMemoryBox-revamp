@@ -37,7 +37,6 @@ const Signup = () => {
   const { toast } = useToast();
 
   const onSubmit = async (data: SignUpFormValues) => {
-    form.reset();
     await authClient.signUp.email(
       {
         email: data.email,
@@ -49,10 +48,10 @@ const Signup = () => {
           setPending(true);
         },
         onSuccess: () => {
+          form.reset();
           toast({
             title: "Account created",
-            description:
-              "your account has been created check your email for confirmation",
+            description: "Your account has been created successfully.",
           });
           console.log("success");
         },
