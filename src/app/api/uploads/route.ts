@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { encodeUploadToken } from "@/lib/uploadUtils";
 import { auth } from "@/lib/auth";
 import { Readable } from "stream";
+import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
 
@@ -59,6 +60,8 @@ export async function POST(request: Request) {
         }
       })();
 
+      // Use Cloudinary authenticated upload so images are not publicly accessible
+      const publicIdForFile = `users/${session.user.id}/${randomUUID()}`;
       const streamUpload = () =>
         new Promise<Record<string, unknown>>((resolve, reject) => {
           const cb = (error: unknown, result?: Record<string, unknown>) => {
@@ -66,7 +69,13 @@ export async function POST(request: Request) {
             resolve(result ?? {});
           };
           const uploadStream = cloudinary.uploader.upload_stream(
-            { resource_type: "auto" },
+            {
+              resource_type: "auto",
+              type: "authenticated",
+              public_id: publicIdForFile,
+              unique_filename: false,
+              overwrite: false,
+            },
             cb,
           );
           nodeReadable.pipe(uploadStream);
@@ -97,7 +106,8 @@ export async function POST(request: Request) {
         data: {
           userId: session.user.id,
           publicId: upload.public_id as string,
-          url: upload.secure_url as string,
+          url: upload.url as string,
+          secureUrl: upload.secure_url as string,
           resourceType: upload.resource_type as string,
           createdAt: new Date(),
         },
@@ -163,10 +173,11 @@ export async function GET(req: Request) {
     );
 
     // Return uploads (url, resourceType) and a time-limited token for the authenticated user
+    // Use secureUrl when available, fall back to legacy url for older records.
     const results = uploads.map((u) => ({
       id: u.id,
       publicId: u.publicId,
-      url: u.url,
+      url: u.secureUrl ?? u.url,
       resourceType: u.resourceType,
       createdAt: u.createdAt,
       token: encodeUploadToken({

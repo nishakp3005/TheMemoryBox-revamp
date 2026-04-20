@@ -4,13 +4,18 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
 type Props = { albumId: string };
+type ProtectedUpload = {
+  id: string;
+  url: string;
+  publicId?: string | null;
+};
 
 export default function ProtectedAlbumContent({ albumId }: Props) {
   const { toast } = useToast();
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [uploads, setUploads] = useState<any[] | null>(null);
+  const [uploads, setUploads] = useState<ProtectedUpload[] | null>(null);
   const verify = async () => {
     if (!password.trim()) {
       toast({ variant: "destructive", title: "Password required" });
@@ -32,7 +37,9 @@ export default function ProtectedAlbumContent({ albumId }: Props) {
         setLoading(false);
         return;
       }
-      setUploads(json.uploads ?? []);
+      setUploads(
+        (Array.isArray(json.uploads) ? json.uploads : []) as ProtectedUpload[],
+      );
     } catch (err) {
       console.error("Verify album password", err);
       toast({ variant: "destructive", title: "Failed to verify" });

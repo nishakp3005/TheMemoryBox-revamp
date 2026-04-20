@@ -1,14 +1,16 @@
 "use client";
 import React, { useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 type Props = { albumId: string; className?: string };
+type UploadResultItem = { id?: string | number };
 
 export default function UploadToAlbumButton({ albumId, className }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
   const router = useRouter();
+  const pathname = usePathname();
 
   return (
     <>
@@ -39,18 +41,38 @@ export default function UploadToAlbumButton({ albumId, className }: Props) {
               return;
             }
             const ids: string[] = Array.isArray(json.results)
-              ? json.results.map((r: any) => String(r.id ?? ""))
+              ? (json.results as UploadResultItem[]).map((r) =>
+                  String(r.id ?? ""),
+                )
               : [];
             if (ids.length > 0) {
-              await fetch(`/api/albums/${encodeURIComponent(albumId)}`, {
+              const addRes = await fetch(`/api/albums/add`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ uploadIds: ids }),
+                body: JSON.stringify({ id: albumId, uploadIds: ids }),
               });
+              const addJson = await addRes.json().catch(() => ({}));
+              if (!addJson?.ok) {
+                uploading?.update?.({
+                  id: uploading.id,
+                  title: "Upload complete (album attach failed)",
+                });
+                toast({
+                  variant: "destructive",
+                  title: "Failed to attach uploads to album",
+                });
+                // still navigate to album so user can see uploads on dashboard
+              }
             }
             uploading?.update?.({ id: uploading.id, title: "Upload complete" });
             setTimeout(() => uploading?.dismiss?.(), 1200);
-            router.replace(`/albums/${albumId}`);
+            toast({ title: "Upload complete" });
+            // If already on the album page, refresh; otherwise navigate to it.
+            if (pathname?.startsWith(`/albums/${albumId}`)) {
+              router.refresh();
+            } else {
+              router.push(`/albums/${albumId}`);
+            }
           } catch (err) {
             console.error("Upload to album error", err);
             toast({ variant: "destructive", title: "Upload failed" });

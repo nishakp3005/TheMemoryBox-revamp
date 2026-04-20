@@ -78,8 +78,9 @@ model Verification {
 model Upload {
   id           String    @id @default(auto()) @map("_id") @db.ObjectId
   userId       String
-  publicId     String
+  publicId     String   @unique
   url          String
+  secureUrl    String?
   resourceType String
   isHidden     Boolean   @default(false)
   albumId      String?   @db.ObjectId

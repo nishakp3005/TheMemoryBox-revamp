@@ -5,6 +5,15 @@ import { sendEmail } from "@/lib/email";
 import { nextCookies } from "better-auth/next-js";
 
 const prisma = new PrismaClient();
+
+const ALLOWED_AUTH_EMAILS = new Set(["nishakp3005@gmail.com"]);
+
+const normalizeEmail = (email?: string | null) =>
+  email?.trim().toLowerCase() ?? "";
+
+const isEmailAllowed = (email?: string | null) =>
+  ALLOWED_AUTH_EMAILS.has(normalizeEmail(email));
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "mongodb",
@@ -32,6 +41,31 @@ export const auth = betterAuth({
     cookieCache: {
       enabled: true,
       maxAge: 5 * 60,
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          if (!isEmailAllowed(user.email)) {
+            return false;
+          }
+        },
+      },
+    },
+    session: {
+      create: {
+        before: async (session) => {
+          const user = await prisma.user.findUnique({
+            where: { id: session.userId },
+            select: { email: true },
+          });
+
+          if (!isEmailAllowed(user?.email)) {
+            return false;
+          }
+        },
+      },
     },
   },
   plugins: [nextCookies()],

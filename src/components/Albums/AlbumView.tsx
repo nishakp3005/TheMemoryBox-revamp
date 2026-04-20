@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import UploadToAlbumButton from "@/components/Albums/UploadToAlbumButton";
 import Link from "next/link";
 import DeleteAlbumSection from "@/components/Albums/DeleteAlbumSection";
@@ -18,6 +18,7 @@ export default function AlbumView({
   uploads: UploadItem[];
 }) {
   const [items, setItems] = useState<UploadItem[]>(uploads);
+  useEffect(() => setItems(uploads), [uploads]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const { toast } = useToast();
 

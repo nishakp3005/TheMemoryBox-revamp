@@ -1,11 +1,13 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import ImageViewer from "@/components/ui/ImageViewer";
 
 type UploadItem = {
   id: string;
   url: string;
   publicId?: string;
   resourceType?: string;
+  token?: string;
 };
 
 export default function AlbumGallery({
@@ -33,14 +35,7 @@ export default function AlbumGallery({
     return () => document.removeEventListener("keydown", handler);
   }, [items, setSelected]);
 
-  const toggleIndex = (idx: number) => {
-    setSelected((cur) => {
-      const next = new Set(cur);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
-      return next;
-    });
-  };
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   return (
     <div>
@@ -49,23 +44,14 @@ export default function AlbumGallery({
           <div
             key={u.id}
             className={`group relative overflow-hidden rounded block ${selected.has(idx) ? "ring-4 ring-offset-0 ring-[#F15087]" : ""}`}
-            onClick={() => toggleIndex(idx)}
+            onClick={() => setViewerIndex(idx)}
           >
-            {u.url.startsWith("/") ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={u.url}
-                alt={u.publicId ?? "photo"}
-                className="w-full h-40 object-cover"
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={u.url}
-                alt={u.publicId ?? "photo"}
-                className="w-full h-40 object-cover"
-              />
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={u.url}
+              alt={u.publicId ?? "photo"}
+              className="w-full h-40 object-cover"
+            />
 
             <div
               className={`absolute top-2 left-2 z-10 transition-opacity ${selected.has(idx) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
@@ -97,6 +83,12 @@ export default function AlbumGallery({
           </div>
         ))}
       </div>
+
+      <ImageViewer
+        items={items.map((i) => ({ id: i.id, url: i.url, token: i.token }))}
+        index={viewerIndex}
+        onIndexChange={(next) => setViewerIndex(next)}
+      />
     </div>
   );
 }

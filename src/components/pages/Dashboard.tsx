@@ -1,5 +1,11 @@
 "use client";
-import React, { useCallback, useState, useEffect, useRef } from "react";
+import React, {
+  useCallback,
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+} from "react";
 import Image from "next/image";
 import JSZip from "jszip";
 // Link and sidebar icons removed — sidebar is now global
@@ -40,10 +46,38 @@ type ServerUpload = {
   resourceType?: string;
   token?: string;
 };
+type AlbumSummary = {
+  id: string;
+  name: string;
+};
 const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
   const [previews, setPreviews] = useState<
-    Array<{ id?: string; url: string; type: string; token?: string }>
+    Array<{
+      id?: string;
+      url: string;
+      type: string;
+      token?: string;
+      createdAt?: string;
+    }>
   >([]);
+  const [dateFilters, setDateFilters] = useState<Set<string>>(new Set());
+
+  const uniqueDates = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of previews) {
+      const d = p.createdAt ? String(p.createdAt).slice(0, 10) : null;
+      if (d) s.add(d);
+    }
+    return Array.from(s).sort((a, b) => b.localeCompare(a));
+  }, [previews]);
+
+  const visiblePreviews = useMemo(() => {
+    if (!dateFilters || dateFilters.size === 0) return previews;
+    return previews.filter((p) => {
+      const d = p.createdAt ? String(p.createdAt).slice(0, 10) : null;
+      return d ? dateFilters.has(d) : false;
+    });
+  }, [previews, dateFilters]);
   const [loading, setLoading] = useState(true);
   const [modalUrl, setModalUrl] = useState<string | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
@@ -54,12 +88,153 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
 
   const [albumName, setAlbumName] = useState<string>("");
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showAlbumPicker, setShowAlbumPicker] = useState(false);
+  const [albumsLoading, setAlbumsLoading] = useState(false);
+  const [albumsForPicker, setAlbumsForPicker] = useState<AlbumSummary[]>([]);
+  const [pendingUploadIds, setPendingUploadIds] = useState<string[]>([]);
+  const [attachingAlbumId, setAttachingAlbumId] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const selectMode = Boolean(searchParams?.get("selectForAlbum"));
   const albumId = String(searchParams?.get("albumId") ?? "");
   const isHiddenView = mode === "hidden";
+
+  const resolveSelectedUploadIds = async () => {
+    const sel = Array.from(selected).sort((a, b) => a - b);
+    const directIds: string[] = [];
+    const missingIndices: number[] = [];
+
+    for (const i of sel) {
+      const preview = visiblePreviews[i];
+      if (!preview) continue;
+      if (typeof preview.id === "string" && preview.id.length > 0) {
+        directIds.push(preview.id);
+      } else {
+        missingIndices.push(i);
+      }
+    }
+
+    if (missingIndices.length === 0) return directIds;
+
+    try {
+      const res = await fetch("/api/uploads");
+      const json = (await res.json()) as {
+        results?: Array<{ id?: string; token?: string; url?: string }>;
+      };
+      const serverResults = Array.isArray(json?.results) ? json.results : [];
+
+      for (const i of missingIndices) {
+        const preview = visiblePreviews[i];
+        if (!preview) continue;
+        const match = serverResults.find(
+          (serverUpload) =>
+            (preview.token && serverUpload.token === preview.token) ||
+            (serverUpload.url && preview.url === serverUpload.url),
+        );
+        if (match?.id) directIds.push(match.id);
+      }
+    } catch (err) {
+      console.error("Resolve selected uploads error", err);
+    }
+
+    return directIds;
+  };
+
+  const openExistingAlbumPicker = async () => {
+    if (selected.size === 0) {
+      toast({ title: "Select some items first" });
+      return;
+    }
+
+    const uploadIds = await resolveSelectedUploadIds();
+    if (uploadIds.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Could not resolve selected memories",
+      });
+      return;
+    }
+
+    setPendingUploadIds(uploadIds);
+    setShowAlbumPicker(true);
+    setAlbumsLoading(true);
+
+    try {
+      const res = await fetch("/api/albums");
+      const json = (await res.json()) as {
+        ok?: boolean;
+        albums?: Array<{ id?: string; name?: string }>;
+        error?: string;
+      };
+
+      if (!json?.ok || !Array.isArray(json.albums)) {
+        throw new Error(json?.error ?? "Failed to fetch albums");
+      }
+
+      setAlbumsForPicker(
+        json.albums
+          .map((album) => ({
+            id: String(album.id ?? ""),
+            name: String(album.name ?? "Untitled album"),
+          }))
+          .filter((album) => album.id.length > 0),
+      );
+    } catch (err) {
+      console.error("Load albums error", err);
+      toast({
+        variant: "destructive",
+        title: "Could not load albums",
+      });
+      setShowAlbumPicker(false);
+    } finally {
+      setAlbumsLoading(false);
+    }
+  };
+
+  const attachSelectedUploadsToAlbum = async (targetAlbumId: string) => {
+    if (pendingUploadIds.length === 0) {
+      toast({ title: "Select some items first" });
+      return;
+    }
+
+    setAttachingAlbumId(targetAlbumId);
+    try {
+      const res = await fetch("/api/albums/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: targetAlbumId,
+          uploadIds: pendingUploadIds,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+
+      if (!json?.ok) {
+        toast({
+          variant: "destructive",
+          title: "Could not add to album",
+          description: json?.error,
+        });
+        return;
+      }
+
+      setSelected(new Set());
+      setShowAlbumPicker(false);
+      setPendingUploadIds([]);
+      toast({ title: "Added to album" });
+      router.replace(`/albums/${targetAlbumId}`);
+    } catch (err) {
+      console.error("Add to album error", err);
+      toast({
+        variant: "destructive",
+        title: "Add to album failed",
+      });
+    } finally {
+      setAttachingAlbumId(null);
+    }
+  };
 
   const getFileNameFromUrl = (url: string, fallbackBase: string): string => {
     try {
@@ -146,8 +321,8 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
 
   const openModalAtIndex = useCallback(
     async (index: number) => {
-      if (index < 0 || index >= previews.length) return;
-      const item = previews[index];
+      if (index < 0 || index >= visiblePreviews.length) return;
+      const item = visiblePreviews[index];
       if (!item) return;
 
       setModalIndex(index);
@@ -180,17 +355,17 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
         setModalLoading(false);
       }
     },
-    [previews, resolvePreviewUrl, toast],
+    [visiblePreviews, resolvePreviewUrl, toast],
   );
 
   const navigateModal = useCallback(
     async (step: -1 | 1) => {
       if (modalIndex === null) return;
       const next = modalIndex + step;
-      if (next < 0 || next >= previews.length) return;
+      if (next < 0 || next >= visiblePreviews.length) return;
       await openModalAtIndex(next);
     },
-    [modalIndex, previews.length, openModalAtIndex],
+    [modalIndex, visiblePreviews.length, openModalAtIndex],
   );
 
   // Use the actual return type of the `toast` helper so our casts match
@@ -225,6 +400,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                     url?: string;
                     resourceType?: string;
                     token?: string;
+                    createdAt?: string;
                   }>;
                   error?: string;
                 }
@@ -240,6 +416,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                     ? "video"
                     : "image",
                 token: r.token,
+                createdAt: r.createdAt ? String(r.createdAt) : undefined,
               }));
               setPreviews(ups);
               modalResolvedUrlCache.current.clear();
@@ -270,8 +447,8 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
       // Ctrl/Cmd + A => select all
       if ((ev.ctrlKey || ev.metaKey) && (ev.key === "a" || ev.key === "A")) {
         ev.preventDefault();
-        if (previews.length > 0) {
-          setSelected(new Set(previews.map((_, i) => i)));
+        if (visiblePreviews.length > 0) {
+          setSelected(new Set(visiblePreviews.map((_, i) => i)));
         }
         return;
       }
@@ -283,7 +460,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [selected, previews]);
+  }, [selected, visiblePreviews]);
 
   useEffect(() => {
     if (modalIndex === null) return;
@@ -303,18 +480,18 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [modalIndex, previews, navigateModal]);
+  }, [modalIndex, visiblePreviews, navigateModal]);
 
   useEffect(() => {
-    if (previews.length === 0) {
+    if (visiblePreviews.length === 0) {
       closeModal();
       modalResolvedUrlCache.current.clear();
       return;
     }
-    if (modalIndex !== null && modalIndex >= previews.length) {
+    if (modalIndex !== null && modalIndex >= visiblePreviews.length) {
       closeModal();
     }
-  }, [previews, modalIndex]);
+  }, [visiblePreviews, modalIndex]);
 
   return (
     <>
@@ -449,7 +626,55 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
             />
 
             <div className="flex items-center gap-3">
-              <div />
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowFilters((s) => !s)}
+                >
+                  Filter dates
+                </Button>
+                {showFilters && (
+                  <div className="absolute right-0 mt-2 w-64 bg-stone-900 border border-stone-700 p-3 rounded-md z-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm text-stone-200">
+                        Filter by date
+                      </div>
+                      <button
+                        className="text-sm text-stone-400 hover:text-stone-200"
+                        onClick={() => setDateFilters(new Set())}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="max-h-48 overflow-auto">
+                      {uniqueDates.length === 0 ? (
+                        <div className="text-sm text-stone-400">No dates</div>
+                      ) : (
+                        uniqueDates.map((d) => (
+                          <label
+                            key={d}
+                            className="flex items-center gap-2 text-sm text-stone-200 py-1"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={dateFilters.has(d)}
+                              onChange={() =>
+                                setDateFilters((cur) => {
+                                  const next = new Set(cur);
+                                  if (next.has(d)) next.delete(d);
+                                  else next.add(d);
+                                  return next;
+                                })
+                              }
+                            />
+                            <span className="select-none">{d}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               {selectMode ? (
                 <div className="flex items-center gap-2">
                   {albumId ? (
@@ -468,25 +693,13 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                             return;
                           }
                           try {
-                            // fetch latest uploads from server to map ids
-                            const res = await fetch("/api/uploads");
-                            const json = await res.json();
-                            const serverResults = Array.isArray(json?.results)
-                              ? (json.results as ServerUpload[])
-                              : [];
-                            const sel = Array.from(selected).sort(
-                              (a, b) => a - b,
-                            );
-                            const uploadIds: string[] = [];
-                            for (const i of sel) {
-                              const p = previews[i];
-                              if (!p) continue;
-                              const match = serverResults.find(
-                                (s: ServerUpload) =>
-                                  (p.token && s.token === p.token) ||
-                                  (s.url && p.url === s.url),
-                              );
-                              if (match?.id) uploadIds.push(match.id);
+                            const uploadIds = await resolveSelectedUploadIds();
+                            if (uploadIds.length === 0) {
+                              toast({
+                                variant: "destructive",
+                                title: "No selectable memories found",
+                              });
+                              return;
                             }
 
                             const addRes = await fetch("/api/albums/add", {
@@ -558,7 +771,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                             );
                             const uploadIds: string[] = [];
                             for (const i of sel) {
-                              const p = previews[i];
+                              const p = visiblePreviews[i];
                               if (!p) continue;
                               const match = serverResults.find(
                                 (s: ServerUpload) =>
@@ -613,15 +826,15 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                   <Button
                     className="bg-[#F15087] text-white hover:bg-[#e03a73]"
                     onClick={() => {
-                      if (previews.length === 0) return;
-                      if (selected.size < previews.length) {
-                        setSelected(new Set(previews.map((_, i) => i)));
+                      if (visiblePreviews.length === 0) return;
+                      if (selected.size < visiblePreviews.length) {
+                        setSelected(new Set(visiblePreviews.map((_, i) => i)));
                       } else {
                         setSelected(new Set());
                       }
                     }}
                   >
-                    {selected.size < previews.length
+                    {selected.size < visiblePreviews.length
                       ? "Select all"
                       : "Deselect all"}
                   </Button>
@@ -634,7 +847,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                         const urls: string[] = [];
                         const sel = Array.from(selected).sort((a, b) => a - b);
                         for (const i of sel) {
-                          const p = previews[i];
+                          const p = visiblePreviews[i];
                           if (!p) continue;
                           if (p.token) {
                             const res = await fetch(
@@ -688,7 +901,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
 
                         for (let order = 0; order < sel.length; order++) {
                           const i = sel[order];
-                          const p = previews[i];
+                          const p = visiblePreviews[i];
                           if (!p) continue;
 
                           let resolvedUrl = p.url;
@@ -790,7 +1003,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                             (a, b) => b - a,
                           );
                           const tokens = sel
-                            .map((i) => previews[i]?.token)
+                            .map((i) => visiblePreviews[i]?.token)
                             .filter(
                               (t): t is string =>
                                 typeof t === "string" && t.length > 0,
@@ -821,10 +1034,14 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                             return;
                           }
 
-                          setPreviews((cur) =>
-                            cur.filter((_, idx) => !selected.has(idx)),
-                          );
                           setSelected(new Set());
+                          try {
+                            const maybeRouter = router as unknown as {
+                              refresh?: () => void;
+                            };
+                            if (typeof maybeRouter.refresh === "function")
+                              maybeRouter.refresh();
+                          } catch {}
 
                           const count = json.restoredCount ?? tokens.length;
                           toast({
@@ -859,7 +1076,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                               (a, b) => b - a,
                             );
                             const tokens = sel
-                              .map((i) => previews[i]?.token)
+                              .map((i) => visiblePreviews[i]?.token)
                               .filter(
                                 (t): t is string =>
                                   typeof t === "string" && t.length > 0,
@@ -890,10 +1107,14 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                               return;
                             }
 
-                            setPreviews((cur) =>
-                              cur.filter((_, idx) => !selected.has(idx)),
-                            );
                             setSelected(new Set());
+                            try {
+                              const maybeRouter = router as unknown as {
+                                refresh?: () => void;
+                              };
+                              if (typeof maybeRouter.refresh === "function")
+                                maybeRouter.refresh();
+                            } catch {}
 
                             const count = json.hiddenCount ?? tokens.length;
                             toast({
@@ -922,25 +1143,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                         onClick={async () => {
                           if (selected.size === 0) return;
                           try {
-                            const res = await fetch("/api/uploads");
-                            const json = await res.json();
-                            const serverResults = Array.isArray(json?.results)
-                              ? (json.results as ServerUpload[])
-                              : [];
-                            const sel = Array.from(selected).sort(
-                              (a, b) => a - b,
-                            );
-                            const uploadIds: string[] = [];
-                            for (const i of sel) {
-                              const p = previews[i];
-                              if (!p) continue;
-                              const match = serverResults.find(
-                                (s: ServerUpload) =>
-                                  (p.token && s.token === p.token) ||
-                                  (s.url && p.url === s.url),
-                              );
-                              if (match?.id) uploadIds.push(match.id);
-                            }
+                            const uploadIds = await resolveSelectedUploadIds();
                             if (uploadIds.length === 0) {
                               toast({
                                 title: "No album-associated uploads found",
@@ -1005,7 +1208,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                       try {
                         const sel = Array.from(selected).sort((a, b) => b - a);
                         for (const i of sel) {
-                          const p = previews[i];
+                          const p = visiblePreviews[i];
                           if (!p) continue;
                           if (p.token) {
                             try {
@@ -1018,10 +1221,14 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                             }
                           }
                         }
-                        setPreviews((cur) =>
-                          cur.filter((_, idx) => !selected.has(idx)),
-                        );
                         setSelected(new Set());
+                        try {
+                          const maybeRouter = router as unknown as {
+                            refresh?: () => void;
+                          };
+                          if (typeof maybeRouter.refresh === "function")
+                            maybeRouter.refresh();
+                        } catch {}
                         toast({ title: "Deleted" });
                       } catch (err) {
                         console.error("Bulk delete error", err);
@@ -1038,59 +1245,8 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                   <Button
                     className="bg-[#F15087] text-white hover:bg-[#e03a73]"
                     onClick={async () => {
-                      const name = window.prompt("Create album name:");
-                      if (!name || !name.trim()) return;
-                      try {
-                        const res = await fetch("/api/uploads");
-                        const json = await res.json();
-                        const serverResults = Array.isArray(json?.results)
-                          ? (json.results as ServerUpload[])
-                          : [];
-                        const sel = Array.from(selected).sort((a, b) => a - b);
-                        const uploadIds: string[] = [];
-                        for (const i of sel) {
-                          const p = previews[i];
-                          if (!p) continue;
-                          const match = serverResults.find(
-                            (s: ServerUpload) =>
-                              (p.token && s.token === p.token) ||
-                              (s.url && p.url === s.url),
-                          );
-                          if (match?.id) uploadIds.push(match.id);
-                        }
-                        const createRes = await fetch("/api/albums", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            name: name.trim(),
-                            uploadIds,
-                          }),
-                        });
-                        const createJson = await createRes.json();
-                        if (!createJson?.ok) {
-                          toast({
-                            variant: "destructive",
-                            title: "Could not create album",
-                          });
-                          return;
-                        }
-                        toast({ title: "Album created" });
-                        router.replace("/albums");
-                      } catch (err) {
-                        console.error(err);
-                        toast({
-                          variant: "destructive",
-                          title: "Create album failed",
-                        });
-                      }
+                      await openExistingAlbumPicker();
                     }}
-                    disabled={selected.size === 0}
-                  >
-                    Create Album
-                  </Button>
-                  <Button
-                    className="bg-[#F15087] text-white hover:bg-[#e03a73]"
-                    onClick={() => router.push("/albums")}
                   >
                     Add to Existing Album
                   </Button>
@@ -1131,7 +1287,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                   url: string;
                   type: string;
                   token?: string;
-                }> = previews;
+                }> = visiblePreviews;
 
                 if (items.length === 0) {
                   return (
@@ -1254,7 +1410,7 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                   variant="ghost"
                   className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/35 hover:bg-black/55 text-white disabled:opacity-30"
                   onClick={() => void navigateModal(1)}
-                  disabled={modalIndex >= previews.length - 1}
+                  disabled={modalIndex >= visiblePreviews.length - 1}
                   aria-label="Next image"
                 >
                   <ChevronRight className="h-5 w-5" />
@@ -1267,6 +1423,64 @@ const Dashboard: React.FC<Props> = ({ mode = "visible" }) => {
                 >
                   Close
                 </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showAlbumPicker && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-2xl rounded-xl border border-stone-700 bg-stone-950 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-stone-800 px-5 py-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-stone-100">
+                    Add selected memories to an existing album
+                  </h2>
+                  <p className="text-sm text-stone-400">
+                    {pendingUploadIds.length} item(s) selected
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowAlbumPicker(false);
+                    setPendingUploadIds([]);
+                  }}
+                >
+                  Close
+                </Button>
+              </div>
+              <div className="max-h-[70vh] overflow-auto p-4">
+                {albumsLoading ? (
+                  <div className="space-y-3">
+                    <div className="h-14 rounded-lg bg-stone-800 animate-pulse" />
+                    <div className="h-14 rounded-lg bg-stone-800 animate-pulse" />
+                    <div className="h-14 rounded-lg bg-stone-800 animate-pulse" />
+                  </div>
+                ) : albumsForPicker.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-stone-700 px-4 py-6 text-stone-400">
+                    No albums found. Create one first, then come back here.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {albumsForPicker.map((album) => (
+                      <button
+                        key={album.id}
+                        onClick={() =>
+                          void attachSelectedUploadsToAlbum(album.id)
+                        }
+                        disabled={attachingAlbumId === album.id}
+                        className="flex w-full items-center justify-between rounded-lg border border-stone-800 bg-stone-900 px-4 py-3 text-left text-stone-100 transition-colors hover:border-[#F15087] hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <span className="font-medium">{album.name}</span>
+                        <span className="text-sm text-stone-400">
+                          {attachingAlbumId === album.id
+                            ? "Adding..."
+                            : "Add here"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

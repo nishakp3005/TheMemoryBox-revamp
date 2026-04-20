@@ -4,18 +4,14 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import Link from "next/link";
-import DeleteAlbumSection from "@/components/Albums/DeleteAlbumSection";
-import UploadToAlbumButton from "@/components/Albums/UploadToAlbumButton";
-import RenameAlbumButton from "@/components/Albums/RenameAlbumButton";
-import RemoveFromAlbumButton from "@/components/Albums/RemoveFromAlbumButton";
 import ProtectedAlbumContent from "@/components/Albums/ProtectedAlbumContent";
 import AlbumView from "@/components/Albums/AlbumView";
 // client-side delete UI is implemented in a separate client component
 
 type Params = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 export default async function AlbumDetailPage({ params }: Params) {
@@ -25,11 +21,11 @@ export default async function AlbumDetailPage({ params }: Params) {
   });
   if (!session?.user) redirect("/login");
 
-  const { id } = (await params) as unknown as { id: string };
+  const { id } = await params;
 
   // If album is protected, do not load uploads server-side.
   const album = await prisma.album.findUnique({ where: { id } });
-  let uploads: any[] = [];
+  let uploads: Awaited<ReturnType<typeof prisma.upload.findMany>> = [];
   if (album && !album.isProtected) {
     uploads = await prisma.upload.findMany({
       where: { albumId: id },

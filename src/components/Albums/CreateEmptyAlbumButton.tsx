@@ -3,6 +3,8 @@ import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
+type UploadResultItem = { id?: string | number };
+
 export default function CreateEmptyAlbumButton() {
   const router = useRouter();
   const { toast } = useToast();
@@ -37,7 +39,9 @@ export default function CreateEmptyAlbumButton() {
 
     try {
       setSubmitting(true);
-      const body: any = { name: trimmedName };
+      const body: { name: string; isProtected?: boolean; password?: string } = {
+        name: trimmedName,
+      };
       if (isProtected) {
         body.isProtected = true;
         body.password = password;
@@ -101,21 +105,37 @@ export default function CreateEmptyAlbumButton() {
         return;
       }
       const ids: string[] = Array.isArray(json.results)
-        ? json.results.map((r: any) => String(r.id ?? ""))
+        ? (json.results as UploadResultItem[]).map((r) => String(r.id ?? ""))
         : [];
       if (ids.length > 0) {
-        await fetch(`/api/albums/${encodeURIComponent(createdAlbumId)}`, {
+        const addRes = await fetch(`/api/albums/add`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ uploadIds: ids }),
+          body: JSON.stringify({ id: createdAlbumId, uploadIds: ids }),
         });
+        const addJson = await addRes.json().catch(() => ({}));
+        if (!addJson?.ok) {
+          uploadingToast?.update?.({
+            id: uploadingToast.id,
+            title: "Upload complete (album attach failed)",
+          });
+          toast({
+            variant: "destructive",
+            title: "Failed to attach uploads to album",
+          });
+        }
       }
       uploadingToast?.update?.({
         id: uploadingToast.id,
         title: "Upload complete",
       });
       setTimeout(() => uploadingToast?.dismiss?.(), 1200);
-      router.push(`/albums/${createdAlbumId}`);
+      toast({ title: "Upload complete" });
+      // Navigate to the album and refresh to pick up server state
+      await router.push(`/albums/${createdAlbumId}`);
+      try {
+        router.refresh();
+      } catch {}
     } catch (err) {
       console.error("Post-create upload error", err);
       toast({ variant: "destructive", title: "Upload failed" });

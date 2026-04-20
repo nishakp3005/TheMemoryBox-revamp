@@ -31,7 +31,14 @@ export async function POST(request: Request) {
       );
 
     // create album (handle optional protection)
-    let albumData: any = {
+    const albumData: {
+      userId: string;
+      name: string;
+      createdAt: Date;
+      isProtected?: boolean;
+      passwordHash?: string;
+      passwordSalt?: string;
+    } = {
       userId: session.user.id,
       name,
       createdAt: new Date(),
