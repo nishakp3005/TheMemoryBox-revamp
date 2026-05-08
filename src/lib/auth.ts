@@ -6,7 +6,7 @@ import { nextCookies } from "better-auth/next-js";
 
 const prisma = new PrismaClient();
 
-const ALLOWED_AUTH_EMAILS = new Set(["nishakp3005@gmail.com"]);
+const ALLOWED_AUTH_EMAILS = new Set(["nishakp3005@gmail.com", "nishitalibrary@gmail.com"]);
 
 const normalizeEmail = (email?: string | null) =>
   email?.trim().toLowerCase() ?? "";

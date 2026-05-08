@@ -39,18 +39,18 @@ export default function AlbumGallery({
 
   return (
     <div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+      <section className="columns-1 sm:columns-2 md:columns-5 gap-4 space-y-4">
         {items.map((u, idx) => (
           <div
             key={u.id}
-            className={`group relative overflow-hidden rounded block ${selected.has(idx) ? "ring-4 ring-offset-0 ring-[#F15087]" : ""}`}
+            className={`group break-inside-avoid mb-4 rounded-lg overflow-hidden relative cursor-pointer ${selected.has(idx) ? "ring-4 ring-offset-0 ring-[#F15087]" : ""}`}
             onClick={() => setViewerIndex(idx)}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={u.url}
               alt={u.publicId ?? "photo"}
-              className="w-full h-40 object-cover"
+              className="w-full h-auto object-cover"
             />
 
             <div
@@ -82,7 +82,7 @@ export default function AlbumGallery({
             </div>
           </div>
         ))}
-      </div>
+      </section>
 
       <ImageViewer
         items={items.map((i) => ({ id: i.id, url: i.url, token: i.token }))}
